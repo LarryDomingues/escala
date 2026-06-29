@@ -1,4 +1,4 @@
-// migrate.js - Script de migração com MongoClient
+// migrate.js - Versão corrigida e simplificada
 const mysql = require('mysql2/promise');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 require('dotenv').config();
@@ -12,40 +12,45 @@ const mysqlConfig = {
   port: 3306,
 };
 
-// Configuração do MongoDB Atlas
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://larrycarvalho2020_db_user:<db_password>@cluster0.zdjlizp.mongodb.net/?appName=Cluster0';
+// Configuração do MongoDB
+// Use a string de conexão ORIGINAL do MongoDB Atlas (com SRV)
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://larrycarvalho2020_db_user:SUA_SENHA@cluster0.zdjlizp.mongodb.net/?appName=Cluster0';
 const MONGODB_DB = process.env.MONGODB_DB || 'escala_louvor';
 
-// Função para conectar ao MongoDB usando MongoClient
-async function connectMongoDB() {
-  console.log('📡 Conectando ao MongoDB Atlas...');
+// Função para testar conexão com MongoDB
+async function testarConexaoMongoDB() {
+  console.log('\n🔍 Testando conexão com MongoDB Atlas...');
   
-  // Criar o cliente com as opções corretas
-  const client = new MongoClient(MONGODB_URI, {
+  // Usar apenas a URI com SRV (a forma correta)
+  const uri = MONGODB_URI;
+  
+  console.log(`📡 URI: ${uri.replace(/\/\/.*@/, '//***:***@')}`); // Oculta credenciais
+  
+  const client = new MongoClient(uri, {
     serverApi: {
       version: ServerApiVersion.v1,
       strict: true,
       deprecationErrors: true,
     },
+    serverSelectionTimeoutMS: 10000,
+    connectTimeoutMS: 10000,
   });
 
   try {
-    // Conectar ao servidor
     await client.connect();
-    
-    // Ping para confirmar a conexão
     await client.db("admin").command({ ping: 1 });
-    console.log('✅ Conectado ao MongoDB Atlas com sucesso!');
-    
-    return client;
+    console.log('✅ Conexão com MongoDB Atlas bem-sucedida!');
+    await client.close();
+    return true;
   } catch (error) {
-    console.error('❌ Erro ao conectar ao MongoDB:', error.message);
-    console.log('\n🔧 Possíveis soluções:');
-    console.log('  1. Verifique se a string de conexão está correta no .env');
-    console.log('  2. Substitua <db_password> pela senha correta');
-    console.log('  3. Libere o IP no MongoDB Atlas (Network Access)');
-    console.log('  4. Verifique se o usuário tem permissões');
-    throw error;
+    console.log(`❌ Erro: ${error.message}`);
+    console.log('\n🔧 SOLUÇÕES:');
+    console.log('  1. Verifique se a senha está correta no arquivo .env');
+    console.log('  2. Libere o IP 0.0.0.0/0 no MongoDB Atlas (Network Access)');
+    console.log('  3. Verifique se o usuário existe e tem permissões');
+    console.log('  4. Verifique se o cluster está ativo');
+    console.log('  5. Tente usar a string de conexão exata do MongoDB Atlas');
+    return false;
   }
 }
 
@@ -58,74 +63,85 @@ async function migrate() {
   let mongoClient;
   
   try {
-    // 1. Conectar ao MySQL
-    console.log('📡 Conectando ao MySQL...');
+    // 1. Testar conexão com MongoDB primeiro
+    const mongoOk = await testarConexaoMongoDB();
+    if (!mongoOk) {
+      console.log('\n❌ Não foi possível conectar ao MongoDB. Corrija os problemas e tente novamente.');
+      console.log('\n💡 Dica: Use a string de conexão exata do MongoDB Atlas:');
+      console.log('   1. Acesse https://cloud.mongodb.com/');
+      console.log('   2. Clique em "Connect" no seu cluster');
+      console.log('   3. Selecione "Connect your application"');
+      console.log('   4. Copie a string de conexão');
+      console.log('   5. Cole no arquivo .env');
+      return;
+    }
+
+    // 2. Conectar ao MySQL
+    console.log('\n📡 Conectando ao MySQL...');
     mysqlConnection = await mysql.createConnection(mysqlConfig);
     console.log('✅ Conectado ao MySQL!');
 
-    // 2. Conectar ao MongoDB usando MongoClient
-    mongoClient = await connectMongoDB();
+    // 3. Conectar ao MongoDB
+    console.log('\n📡 Conectando ao MongoDB...');
+    mongoClient = new MongoClient(MONGODB_URI, {
+      serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+      },
+    });
+    await mongoClient.connect();
     const db = mongoClient.db(MONGODB_DB);
+    console.log('✅ Conectado ao MongoDB!');
 
-    // 3. Verificar se já existem dados e perguntar se deseja limpar
+    // 4. Verificar e limpar dados
+    console.log('\n🧹 Verificando dados existentes...');
     const collections = await db.listCollections().toArray();
-    const hasData = collections.length > 0;
-    
-    if (hasData) {
-      console.log('⚠️ O banco de dados já contém dados.');
+    if (collections.length > 0) {
+      console.log(`⚠️ Encontradas ${collections.length} coleções.`);
       const readline = require('readline').createInterface({
         input: process.stdin,
         output: process.stdout,
       });
       
       const answer = await new Promise((resolve) => {
-        readline.question('Deseja limpar os dados existentes antes de migrar? (s/N) ', resolve);
+        readline.question('Deseja limpar os dados existentes? (s/N) ', resolve);
       });
       readline.close();
       
       if (answer.toLowerCase() === 's') {
-        console.log('🧹 Limpando dados existentes...');
         for (const collection of collections) {
           await db.collection(collection.name).deleteMany({});
           console.log(`  ✅ Coleção "${collection.name}" limpa`);
         }
         console.log('✅ Dados limpos!');
-      } else {
-        console.log('⚠️ Mantendo dados existentes. Novos dados serão adicionados.');
       }
     }
 
-    // 4. Migrar Habilidades
-    console.log('📤 Migrando habilidades...');
+    // 5. Migrar Habilidades
+    console.log('\n📤 Migrando habilidades...');
     const [habilidades] = await mysqlConnection.query('SELECT * FROM habilidades');
     const habilidadeMap = {};
     
-    // Verificar se há habilidades
     if (habilidades.length === 0) {
       console.log('⚠️ Nenhuma habilidade encontrada. Criando habilidades padrão...');
       const habilidadesPadrao = ['Voz', 'Voz2', 'Violão', 'Guitarra', 'Baixo', 'Bateria', 'Teclado'];
       for (const nome of habilidadesPadrao) {
-        const result = await db.collection('habilidades').insertOne({ 
-          nome, 
-          createdAt: new Date() 
-        });
+        const result = await db.collection('habilidades').insertOne({ nome });
         habilidadeMap[`padrao_${nome}`] = result.insertedId;
         console.log(`  ✅ Habilidade "${nome}" criada`);
       }
     } else {
       for (const hab of habilidades) {
-        const result = await db.collection('habilidades').insertOne({ 
-          nome: hab.nome,
-          createdAt: new Date(),
-        });
+        const result = await db.collection('habilidades').insertOne({ nome: hab.nome });
         habilidadeMap[hab.id] = result.insertedId;
         console.log(`  ✅ Habilidade "${hab.nome}" migrada`);
       }
     }
     console.log(`✅ ${Object.keys(habilidadeMap).length} habilidades migradas/criadas!`);
 
-    // 5. Migrar Usuários
-    console.log('📤 Migrando usuários...');
+    // 6. Migrar Usuários
+    console.log('\n📤 Migrando usuários...');
     const [usuarios] = await mysqlConnection.query('SELECT * FROM usuarios');
     const usuarioMap = {};
     
@@ -141,8 +157,6 @@ async function migrate() {
         token_ativacao: user.token_ativacao || null,
         token_recuperacao: user.token_recuperacao || null,
         data_recuperacao: user.data_recuperacao ? new Date(user.data_recuperacao) : null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       };
       
       const result = await db.collection('usuarios').insertOne(usuarioData);
@@ -151,13 +165,12 @@ async function migrate() {
     }
     console.log(`✅ ${usuarios.length} usuários migrados!`);
 
-    // 6. Migrar Membros
-    console.log('📤 Migrando membros...');
+    // 7. Migrar Membros
+    console.log('\n📤 Migrando membros...');
     const [membros] = await mysqlConnection.query('SELECT * FROM membros');
     const membroMap = {};
     
     for (const m of membros) {
-      // Buscar habilidades do membro
       const [membroHabilidades] = await mysqlConnection.query(
         'SELECT habilidade_id FROM membro_habilidade WHERE membro_id = ?',
         [m.id]
@@ -176,8 +189,6 @@ async function migrate() {
         habilidade_ids: habilidadeIds,
         criado_por: usuarioMap[m.criado_por] || null,
         criado_em: m.criado_em ? new Date(m.criado_em) : new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
       };
       
       const result = await db.collection('membros').insertOne(membroData);
@@ -186,11 +197,10 @@ async function migrate() {
     }
     console.log(`✅ ${membros.length} membros migrados!`);
 
-    // 7. Migrar Escalas
-    console.log('📤 Migrando escalas...');
+    // 8. Migrar Escalas
+    console.log('\n📤 Migrando escalas...');
     const [escalas] = await mysqlConnection.query('SELECT * FROM escala');
     
-    let escalasMigradas = 0;
     for (const e of escalas) {
       const escalaData = {
         data: e.data,
@@ -207,23 +217,17 @@ async function migrate() {
         criado_em: e.criado_em ? new Date(e.criado_em) : new Date(),
         atualizado_por: usuarioMap[e.atualizado_por] || null,
         atualizado_em: e.atualizado_em ? new Date(e.atualizado_em) : null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       };
       
       await db.collection('escala').insertOne(escalaData);
-      escalasMigradas++;
-      if (escalasMigradas % 10 === 0) {
-        console.log(`  ✅ ${escalasMigradas} escalas migradas...`);
-      }
+      console.log(`  ✅ Escala do dia ${e.data} migrada`);
     }
     console.log(`✅ ${escalas.length} escalas migradas!`);
 
-    // 8. Migrar Logs
-    console.log('📤 Migrando logs...');
+    // 9. Migrar Logs
+    console.log('\n📤 Migrando logs...');
     const [logs] = await mysqlConnection.query('SELECT * FROM logs');
     
-    let logsMigrados = 0;
     for (const log of logs) {
       const logData = {
         usuario_id: usuarioMap[log.usuario_id] || null,
@@ -231,25 +235,28 @@ async function migrate() {
         descricao: log.descricao || '',
         ip: log.ip || '0.0.0.0',
         data_hora: log.data_hora ? new Date(log.data_hora) : new Date(),
-        createdAt: new Date(),
       };
       
       await db.collection('logs').insertOne(logData);
-      logsMigrados++;
+      console.log(`  ✅ Log "${log.acao}" migrado`);
     }
     console.log(`✅ ${logs.length} logs migrados!`);
 
-    // 9. Criar índices para melhor performance
-    console.log('📤 Criando índices no MongoDB...');
-    await db.collection('usuarios').createIndex({ email: 1 }, { unique: true });
-    await db.collection('membros').createIndex({ usuario_id: 1 });
-    await db.collection('membros').createIndex({ nome: 1 });
-    await db.collection('escala').createIndex({ data: 1 });
-    await db.collection('escala').createIndex({ data: 1, dia_semana: 1 });
-    await db.collection('logs').createIndex({ data_hora: -1 });
-    await db.collection('logs').createIndex({ usuario_id: 1 });
-    console.log('✅ Índices criados!');
+    // 10. Criar índices
+    console.log('\n📤 Criando índices...');
+    try {
+      await db.collection('usuarios').createIndex({ email: 1 }, { unique: true });
+      await db.collection('membros').createIndex({ usuario_id: 1 });
+      await db.collection('membros').createIndex({ nome: 1 });
+      await db.collection('escala').createIndex({ data: 1 });
+      await db.collection('logs').createIndex({ data_hora: -1 });
+      await db.collection('logs').createIndex({ usuario_id: 1 });
+      console.log('✅ Índices criados!');
+    } catch (error) {
+      console.log(`⚠️ Erro ao criar índices: ${error.message}`);
+    }
 
+    // 11. Resumo
     console.log('\n🎉 MIGRAÇÃO CONCLUÍDA COM SUCESSO!');
     console.log(`📊 Resumo:`);
     console.log(`  - Habilidades: ${habilidades.length || 7}`);
@@ -260,15 +267,14 @@ async function migrate() {
     console.log(`\n📌 Banco de dados: ${MONGODB_DB}`);
 
   } catch (error) {
-    console.error('❌ Erro durante a migração:', error.message);
+    console.error('\n❌ Erro durante a migração:', error.message);
     if (error.stack) {
       console.error(error.stack);
     }
   } finally {
-    // Fechar conexões
     if (mysqlConnection) {
       await mysqlConnection.end();
-      console.log('🔌 Conexão MySQL fechada.');
+      console.log('\n🔌 Conexão MySQL fechada.');
     }
     if (mongoClient) {
       await mongoClient.close();
@@ -294,57 +300,16 @@ JWT_SECRET=seu_jwt_secret_aqui
   }
 }
 
-// Função para testar a conexão com MongoDB
-async function testConnection() {
-  console.log('🔍 Testando conexão com MongoDB Atlas...');
-  
-  const client = new MongoClient(MONGODB_URI, {
-    serverApi: {
-      version: ServerApiVersion.v1,
-      strict: true,
-      deprecationErrors: true,
-    },
-  });
-
-  try {
-    await client.connect();
-    await client.db("admin").command({ ping: 1 });
-    console.log('✅ Conexão com MongoDB Atlas funcionando!');
-    await client.close();
-    return true;
-  } catch (error) {
-    console.error('❌ Erro ao conectar:', error.message);
-    console.log('\n🔧 Verifique:');
-    console.log('  1. A senha no .env está correta?');
-    console.log('  2. O IP está liberado no MongoDB Atlas?');
-    console.log('  3. O usuário existe e tem permissões?');
-    return false;
-  }
-}
-
-// Executar migração
+// Executar
 async function main() {
   checkEnv();
   
   // Carregar variáveis de ambiente
   require('dotenv').config();
   
-  // Atualizar a URI com a senha do .env
-  const password = process.env.MONGODB_PASSWORD || '';
-  if (password) {
-    process.env.MONGODB_URI = process.env.MONGODB_URI.replace('<db_password>', password);
-  }
+  console.log('🔍 Verificando configuração...');
+  console.log(`📡 URI: ${process.env.MONGODB_URI?.replace(/\/\/.*@/, '//***:***@') || 'Não definida'}`);
   
-  console.log('🔍 Verificando conexão...');
-  const isConnected = await testConnection();
-  
-  if (!isConnected) {
-    console.log('\n❌ Não foi possível conectar ao MongoDB. Corrija os problemas e tente novamente.');
-    console.log('💡 Dica: Substitua <db_password> pela senha correta no arquivo .env');
-    process.exit(1);
-  }
-  
-  // Perguntar se deseja continuar
   const readline = require('readline').createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -362,5 +327,4 @@ async function main() {
   }
 }
 
-// Executar
 main().catch(console.error);
