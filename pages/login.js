@@ -65,9 +65,9 @@ export default function Login() {
         <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-md">
           <div className="text-center mb-6">
             <div className="flex justify-center mb-2">
-              <Image src="/logo.png" alt="Logo" width={80} height={80} className="rounded-xl" />
+              <Image src="/logo.png" alt="Logo" width={320} height={320} className="rounded-xl" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-800">🎵 Ministério de Louvor</h1>
+            
             <p className="text-gray-500 text-sm">Sistema de Escala</p>
           </div>
 

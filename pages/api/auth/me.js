@@ -1,4 +1,4 @@
-import connectDB from '../../../lib/mondodb';
+import connectDB from '../../../lib/mongodb';
 import Usuario from '../../../lib/models/Usuario';
 import { getUserFromToken } from '../../../lib/auth';
 
