@@ -1,3 +1,4 @@
+// pages/cadastro-membros.js - Versão corrigida
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
@@ -74,29 +75,42 @@ export default function CadastroMembros() {
     setMensagemTipo('');
 
     try {
+      // Validar nome
+      if (!form.nome || form.nome.trim() === '') {
+        setMensagem('Nome é obrigatório');
+        setMensagemTipo('error');
+        setSalvando(false);
+        return;
+      }
+
       const dados = {
-        nome: form.nome,
-        celular: form.celular,
-        email: form.email,
-        data_nascimento: form.data_nascimento,
-        habilidades: form.habilidades,
+        nome: form.nome.trim(),
+        celular: form.celular || '',
+        email: form.email || '',
+        data_nascimento: form.data_nascimento || '',
+        habilidades: form.habilidades || [],
       };
 
+      let response;
       if (editando && form.id) {
-        await axios.put(`/api/membros/${form.id}`, dados);
-        setMensagem('Membro atualizado com sucesso!');
+        // Editar
+        response = await axios.put(`/api/membros/${form.id}`, dados);
+        setMensagem(response.data.message || 'Membro atualizado com sucesso!');
         setMensagemTipo('success');
       } else {
-        await axios.post('/api/membros', dados);
-        setMensagem('Membro cadastrado com sucesso!');
+        // Novo
+        response = await axios.post('/api/membros', dados);
+        setMensagem(response.data.message || 'Membro cadastrado com sucesso!');
         setMensagemTipo('success');
       }
 
       resetForm();
       await carregarDados();
+
     } catch (error) {
       console.error('Erro ao salvar:', error);
-      setMensagem(error.response?.data?.error || 'Erro ao salvar membro');
+      const errorMsg = error.response?.data?.error || error.response?.data?.message || 'Erro ao salvar membro';
+      setMensagem(errorMsg);
       setMensagemTipo('error');
     } finally {
       setSalvando(false);
@@ -105,8 +119,10 @@ export default function CadastroMembros() {
 
   const handleEdit = async (id) => {
     try {
+      setLoading(true);
       const res = await axios.get(`/api/membros/${id}`);
       const membro = res.data;
+      
       setForm({
         id: membro.id,
         nome: membro.nome || '',
@@ -116,16 +132,21 @@ export default function CadastroMembros() {
         habilidades: membro.habilidade_ids || [],
       });
       setEditando(true);
+      
+      // Scroll para o formulário
       document.getElementById('form-membro')?.scrollIntoView({ behavior: 'smooth' });
     } catch (error) {
       console.error('Erro ao buscar membro:', error);
       setMensagem('Erro ao carregar dados para edição');
       setMensagemTipo('error');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDelete = async (id, nome) => {
     if (!confirm(`Tem certeza que deseja excluir o membro "${nome}"?`)) return;
+    
     try {
       await axios.delete(`/api/membros/${id}`);
       setMensagem('Membro excluído com sucesso!');
@@ -148,6 +169,10 @@ export default function CadastroMembros() {
       habilidades: [],
     });
     setEditando(false);
+  };
+
+  const cancelarEdicao = () => {
+    resetForm();
   };
 
   return (
@@ -177,47 +202,100 @@ export default function CadastroMembros() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo *</label>
-                <input type="text" name="nome" value={form.nome} onChange={handleInputChange} className="input-field" placeholder="Digite o nome completo" required />
+                <input
+                  type="text"
+                  name="nome"
+                  value={form.nome}
+                  onChange={handleInputChange}
+                  className="input-field"
+                  placeholder="Digite o nome completo"
+                  required
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Celular</label>
-                <input type="text" name="celular" value={form.celular} onChange={handleInputChange} className="input-field" placeholder="(00) 00000-0000" />
+                <input
+                  type="text"
+                  name="celular"
+                  value={form.celular}
+                  onChange={handleInputChange}
+                  className="input-field"
+                  placeholder="(00) 00000-0000"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-                <input type="email" name="email" value={form.email} onChange={handleInputChange} className="input-field" placeholder="email@exemplo.com" />
+                <input
+                  type="email"
+                  name="email"
+                  value={form.email}
+                  onChange={handleInputChange}
+                  className="input-field"
+                  placeholder="email@exemplo.com"
+                />
                 <p className="text-xs text-gray-400 mt-1">Se não existir, será criado um usuário automaticamente</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
-                <input type="date" name="data_nascimento" value={form.data_nascimento} onChange={handleInputChange} className="input-field" />
+                <input
+                  type="date"
+                  name="data_nascimento"
+                  value={form.data_nascimento}
+                  onChange={handleInputChange}
+                  className="input-field"
+                />
               </div>
             </div>
 
             <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Habilidades</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Habilidades (selecione todas que se aplicam)</label>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                 {habilidades.map((hab) => (
-                  <label key={hab.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition ${form.habilidades.includes(hab.id) ? 'bg-indigo-50 border-indigo-500' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}>
-                    <input type="checkbox" checked={form.habilidades.includes(hab.id)} onChange={() => handleHabilidadeChange(hab.id)} className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500" />
+                  <label
+                    key={hab.id}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition ${
+                      form.habilidades.includes(hab.id)
+                        ? 'bg-indigo-50 border-indigo-500'
+                        : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={form.habilidades.includes(hab.id)}
+                      onChange={() => handleHabilidadeChange(hab.id)}
+                      className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                    />
                     <span className="text-sm">{hab.nome}</span>
                   </label>
                 ))}
               </div>
-              {editando && <p className="text-xs text-gray-400 mt-2">💡 Habilidades marcadas: {form.habilidades.length}</p>}
+              {editando && (
+                <p className="text-xs text-gray-400 mt-2">💡 Habilidades marcadas: {form.habilidades.length}</p>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-3 mt-6">
-              <button type="submit" disabled={salvando} className="btn-primary px-6 py-2 text-sm md:text-base">
+              <button
+                type="submit"
+                disabled={salvando}
+                className="btn-primary px-6 py-2 text-sm md:text-base"
+              >
                 {salvando ? 'Salvando...' : editando ? '💾 Atualizar Membro' : '➕ Cadastrar Membro'}
               </button>
               {editando && (
-                <button type="button" onClick={resetForm} className="btn-warning px-6 py-2 text-sm md:text-base">❌ Cancelar</button>
+                <button
+                  type="button"
+                  onClick={cancelarEdicao}
+                  className="btn-warning px-6 py-2 text-sm md:text-base"
+                >
+                  ❌ Cancelar Edição
+                </button>
               )}
             </div>
           </form>
         </div>
 
+        {/* Lista de Membros */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="p-3 md:p-4 border-b flex justify-between items-center flex-wrap gap-2">
             <h2 className="text-base md:text-lg font-semibold text-gray-800">📋 Membros Cadastrados</h2>
@@ -225,11 +303,14 @@ export default function CadastroMembros() {
           </div>
 
           {loading ? (
-            <div className="flex justify-center items-center h-64"><div className="text-gray-500">Carregando membros...</div></div>
+            <div className="flex justify-center items-center h-64">
+              <div className="text-gray-500">Carregando membros...</div>
+            </div>
           ) : membros.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <div className="text-5xl mb-4">👤</div>
               <p>Nenhum membro cadastrado ainda.</p>
+              <p className="text-sm text-gray-400 mt-1">Use o formulário acima para adicionar membros.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -256,12 +337,26 @@ export default function CadastroMembros() {
                               <span key={i} className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">{hab}</span>
                             ))}
                           </div>
-                        ) : <span className="text-gray-400 text-sm">Nenhuma</span>}
+                        ) : (
+                          <span className="text-gray-400 text-sm">Nenhuma</span>
+                        )}
                       </td>
                       <td className="px-2 md:px-4 py-2 text-center">
                         <div className="flex items-center justify-center gap-2">
-                          <button onClick={() => handleEdit(membro.id)} className="p-1.5 text-yellow-600 hover:bg-yellow-50 rounded-lg transition">✏️</button>
-                          <button onClick={() => handleDelete(membro.id, membro.nome)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition">🗑️</button>
+                          <button
+                            onClick={() => handleEdit(membro.id)}
+                            className="p-1.5 text-yellow-600 hover:bg-yellow-50 rounded-lg transition"
+                            title="Editar"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => handleDelete(membro.id, membro.nome)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
+                            title="Excluir"
+                          >
+                            🗑️
+                          </button>
                         </div>
                       </td>
                     </tr>

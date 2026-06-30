@@ -1,3 +1,4 @@
+// pages/api/membros/habilidades.js
 import connectDB from '../../../lib/mongodb';
 import Habilidade from '../../../lib/models/Habilidade';
 
@@ -15,7 +16,13 @@ export default async function handler(req, res) {
         habilidades = await Habilidade.find().sort({ nome: 1 });
       }
 
-      return res.status(200).json(habilidades.map(h => ({ id: h._id, nome: h.nome })));
+      // Formatar resposta
+      const result = habilidades.map(h => ({
+        id: h._id,
+        nome: h.nome,
+      }));
+
+      return res.status(200).json(result);
     } catch (error) {
       console.error('Erro ao buscar habilidades:', error);
       return res.status(500).json({ error: 'Erro ao buscar habilidades' });
