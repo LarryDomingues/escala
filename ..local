@@ -1,0 +1,3 @@
+MONGODB_URI=mongodb+srv://larrycarvalho2020_db_user:KMfFBbXQPczfZ2W@cluster0.mongodb.net/
+JWT_SECRET=seu_jwt_secret_aqui
+MONGODB_PASSWORD=KMfFBbXQPczfZ2W

@@ -1,4 +1,4 @@
-// migrate.js - Versão corrigida e simplificada
+// migrate.js - Versão Corrigida
 const mysql = require('mysql2/promise');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 require('dotenv').config();
@@ -12,21 +12,38 @@ const mysqlConfig = {
   port: 3306,
 };
 
-// Configuração do MongoDB
-// Use a string de conexão ORIGINAL do MongoDB Atlas (com SRV)
+// 🔥 CORREÇÃO: Pegar a URI corretamente do .env
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://larrycarvalho2020_db_user:SUA_SENHA@cluster0.zdjlizp.mongodb.net/?appName=Cluster0';
 const MONGODB_DB = process.env.MONGODB_DB || 'escala_louvor';
+
+console.log('🔍 DEBUG:');
+console.log(`MONGODB_URI: ${MONGODB_URI.substring(0, 50)}...`);
+console.log(`MONGODB_DB: ${MONGODB_DB}`);
 
 // Função para testar conexão com MongoDB
 async function testarConexaoMongoDB() {
   console.log('\n🔍 Testando conexão com MongoDB Atlas...');
   
-  // Usar apenas a URI com SRV (a forma correta)
-  const uri = MONGODB_URI;
+  // Verificar se a URI é válida
+  if (!MONGODB_URI || MONGODB_URI === 'mongodb+srv://larrycarvalho2020_db_user:SUA_SENHA@cluster0.zdjlizp.mongodb.net/?appName=Cluster0') {
+    console.log('❌ A senha não foi configurada!');
+    console.log('\n🔧 SOLUÇÃO:');
+    console.log('  1. Abra o arquivo .env');
+    console.log('  2. Substitua SUA_SENHA pela senha correta do MongoDB Atlas');
+    console.log('  3. Execute o script novamente');
+    return false;
+  }
   
-  console.log(`📡 URI: ${uri.replace(/\/\/.*@/, '//***:***@')}`); // Oculta credenciais
+  // Verificar se a URI começa com o prefixo correto
+  if (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+srv://')) {
+    console.log(`❌ URI inválida: ${MONGODB_URI.substring(0, 50)}...`);
+    console.log('   A URI deve começar com "mongodb://" ou "mongodb+srv://"');
+    return false;
+  }
   
-  const client = new MongoClient(uri, {
+  console.log(`📡 URI: ${MONGODB_URI.replace(/\/\/.*@/, '//***:***@')}`); // Oculta credenciais
+  
+  const client = new MongoClient(MONGODB_URI, {
     serverApi: {
       version: ServerApiVersion.v1,
       strict: true,
@@ -49,7 +66,6 @@ async function testarConexaoMongoDB() {
     console.log('  2. Libere o IP 0.0.0.0/0 no MongoDB Atlas (Network Access)');
     console.log('  3. Verifique se o usuário existe e tem permissões');
     console.log('  4. Verifique se o cluster está ativo');
-    console.log('  5. Tente usar a string de conexão exata do MongoDB Atlas');
     return false;
   }
 }
@@ -67,12 +83,13 @@ async function migrate() {
     const mongoOk = await testarConexaoMongoDB();
     if (!mongoOk) {
       console.log('\n❌ Não foi possível conectar ao MongoDB. Corrija os problemas e tente novamente.');
-      console.log('\n💡 Dica: Use a string de conexão exata do MongoDB Atlas:');
+      console.log('\n💡 Como obter a string de conexão correta:');
       console.log('   1. Acesse https://cloud.mongodb.com/');
       console.log('   2. Clique em "Connect" no seu cluster');
       console.log('   3. Selecione "Connect your application"');
       console.log('   4. Copie a string de conexão');
       console.log('   5. Cole no arquivo .env');
+      console.log('   6. Substitua <password> pela senha correta');
       return;
     }
 
@@ -308,7 +325,8 @@ async function main() {
   require('dotenv').config();
   
   console.log('🔍 Verificando configuração...');
-  console.log(`📡 URI: ${process.env.MONGODB_URI?.replace(/\/\/.*@/, '//***:***@') || 'Não definida'}`);
+  console.log(`📡 URI: ${process.env.MONGODB_URI ? process.env.MONGODB_URI.replace(/\/\/.*@/, '//***:***@') : 'Não definida'}`);
+  console.log(`📡 DB: ${process.env.MONGODB_DB || 'Não definido'}`);
   
   const readline = require('readline').createInterface({
     input: process.stdin,
