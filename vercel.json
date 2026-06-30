@@ -11,10 +11,5 @@
       "src": "/(.*)",
       "dest": "/$1"
     }
-  ],
-  "env": {
-    "MONGODB_URI": "@mongodb_uri",
-    "MONGODB_DB": "@mongodb_db",
-    "JWT_SECRET": "@jwt_secret"
-  }
+  ]
 }
