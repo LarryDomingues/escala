@@ -65,6 +65,32 @@ export default function GerenciarUsuarios() {
     }
   };
 
+  const handleRebaixar = async (id, nome) => {
+    if (!confirm(`Tem certeza que deseja rebaixar "${nome}" para membro?`)) return;
+    try {
+      await axios.put(`/api/admin/usuarios/${id}`, { nivel: 'membro' });
+      setMensagem(`Usuário rebaixado para membro!`);
+      setMensagemTipo('success');
+      await carregarUsuarios();
+    } catch (error) {
+      setMensagem(error.response?.data?.error || 'Erro ao rebaixar usuário');
+      setMensagemTipo('error');
+    }
+  };
+
+  const handleDeletar = async (id, nome) => {
+    if (!confirm(`Tem certeza que deseja DELETAR o usuário "${nome}"? Esta ação não pode ser desfeita!`)) return;
+    try {
+      await axios.delete(`/api/admin/usuarios/${id}`);
+      setMensagem(`Usuário ${nome} deletado com sucesso!`);
+      setMensagemTipo('success');
+      await carregarUsuarios();
+    } catch (error) {
+      setMensagem(error.response?.data?.error || 'Erro ao deletar usuário');
+      setMensagemTipo('error');
+    }
+  };
+
   const getStatusBadge = (status) => {
     const classes = {
       ativo: 'badge-ativo',
@@ -120,40 +146,102 @@ export default function GerenciarUsuarios() {
                   <th className="px-2 md:px-4 py-2 text-left">Nível</th>
                   <th className="px-2 md:px-4 py-2 text-left">Status</th>
                   <th className="px-2 md:px-4 py-2 text-left hidden md:table-cell">Último Login</th>
-                  <th className="px-2 md:px-4 py-2 text-center">Ações</th>
+                  <th className="px-2 md:px-4 py-2 text-center min-w-[200px]">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {usuarios.map((usuario) => (
-                  <tr key={usuario.id} className="hover:bg-gray-50">
-                    <td className="px-2 md:px-4 py-2 font-medium text-gray-900">
-                      {usuario.nome}
-                      {user && usuario.id === user.id && <span className="ml-2 text-xs text-indigo-600">(Você)</span>}
-                    </td>
-                    <td className="px-2 md:px-4 py-2 text-gray-600 hidden sm:table-cell">{usuario.email}</td>
-                    <td className="px-2 md:px-4 py-2"><span className={getNivelBadge(usuario.nivel)}>{usuario.nivel}</span></td>
-                    <td className="px-2 md:px-4 py-2"><span className={getStatusBadge(usuario.status)}>{usuario.status}</span></td>
-                    <td className="px-2 md:px-4 py-2 text-gray-500 hidden md:table-cell">{formatarData(usuario.ultimo_login)}</td>
-                    <td className="px-2 md:px-4 py-2">
-                      <div className="flex flex-wrap items-center justify-center gap-1 md:gap-2">
-                        {usuario.status === 'pendente' && (!user || usuario.id !== user.id) && (
-                          <button onClick={() => handleAcao(usuario.id, 'ativar', usuario.nome)} className="btn-success text-xs px-2 py-1">Ativar</button>
-                        )}
-                        {usuario.status === 'ativo' && (!user || usuario.id !== user.id) && (
-                          <button onClick={() => handleAcao(usuario.id, 'bloquear', usuario.nome)} className="btn-danger text-xs px-2 py-1">Bloquear</button>
-                        )}
-                        {usuario.status === 'bloqueado' && (!user || usuario.id !== user.id) && (
-                          <button onClick={() => handleAcao(usuario.id, 'desbloquear', usuario.nome)} className="btn-success text-xs px-2 py-1">Desbloquear</button>
-                        )}
-                        {usuario.nivel !== 'admin' && (!user || usuario.id !== user.id) && (
-                          <button onClick={() => handlePromover(usuario.id, usuario.nivel, usuario.nome)} className="btn-warning text-xs px-2 py-1">
-                            {usuario.nivel === 'membro' ? '↑' : '↓'}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {usuarios.map((usuario) => {
+                  const isCurrentUser = user && usuario.id === user.id;
+                  return (
+                    <tr key={usuario.id} className="hover:bg-gray-50">
+                      <td className="px-2 md:px-4 py-2 font-medium text-gray-900">
+                        {usuario.nome}
+                        {isCurrentUser && <span className="ml-2 text-xs text-indigo-600">(Você)</span>}
+                      </td>
+                      <td className="px-2 md:px-4 py-2 text-gray-600 hidden sm:table-cell">{usuario.email}</td>
+                      <td className="px-2 md:px-4 py-2">
+                        <span className={getNivelBadge(usuario.nivel)}>{usuario.nivel}</span>
+                      </td>
+                      <td className="px-2 md:px-4 py-2">
+                        <span className={getStatusBadge(usuario.status)}>{usuario.status}</span>
+                      </td>
+                      <td className="px-2 md:px-4 py-2 text-gray-500 hidden md:table-cell">
+                        {formatarData(usuario.ultimo_login)}
+                      </td>
+                      <td className="px-2 md:px-4 py-2">
+                        <div className="flex flex-wrap items-center justify-center gap-1 md:gap-2">
+                          {/* Ativar - apenas para pendentes e não é o usuário atual */}
+                          {usuario.status === 'pendente' && !isCurrentUser && (
+                            <button
+                              onClick={() => handleAcao(usuario.id, 'ativar', usuario.nome)}
+                              className="bg-green-600 text-white text-xs px-2 py-1 rounded hover:bg-green-700 transition"
+                            >
+                              Ativar
+                            </button>
+                          )}
+
+                          {/* Bloquear - apenas para ativos e não é o usuário atual */}
+                          {usuario.status === 'ativo' && !isCurrentUser && (
+                            <button
+                              onClick={() => handleAcao(usuario.id, 'bloquear', usuario.nome)}
+                              className="bg-orange-500 text-white text-xs px-2 py-1 rounded hover:bg-orange-600 transition"
+                            >
+                              Bloquear
+                            </button>
+                          )}
+
+                          {/* Desbloquear - apenas para bloqueados e não é o usuário atual */}
+                          {usuario.status === 'bloqueado' && !isCurrentUser && (
+                            <button
+                              onClick={() => handleAcao(usuario.id, 'desbloquear', usuario.nome)}
+                              className="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-700 transition"
+                            >
+                              Desbloquear
+                            </button>
+                          )}
+
+                          {/* Promover - apenas para membros/coordenadores e não é admin */}
+                          {usuario.nivel !== 'admin' && !isCurrentUser && (
+                            <button
+                              onClick={() => handlePromover(usuario.id, usuario.nivel, usuario.nome)}
+                              className="bg-indigo-600 text-white text-xs px-2 py-1 rounded hover:bg-indigo-700 transition"
+                              title={usuario.nivel === 'membro' ? 'Promover para Coordenador' : 'Promover para Admin'}
+                            >
+                              ↑
+                            </button>
+                          )}
+
+                          {/* Rebaixar - apenas para coordenadores e não é o usuário atual */}
+                          {usuario.nivel === 'coordenador' && !isCurrentUser && (
+                            <button
+                              onClick={() => handleRebaixar(usuario.id, usuario.nome)}
+                              className="bg-yellow-600 text-white text-xs px-2 py-1 rounded hover:bg-yellow-700 transition"
+                              title="Rebaixar para Membro"
+                            >
+                              ↓
+                            </button>
+                          )}
+
+                          {/* Deletar - apenas para não admin e não é o usuário atual */}
+                          {usuario.nivel !== 'admin' && !isCurrentUser && (
+                            <button
+                              onClick={() => handleDeletar(usuario.id, usuario.nome)}
+                              className="bg-red-600 text-white text-xs px-2 py-1 rounded hover:bg-red-700 transition"
+                              title="Deletar Usuário"
+                            >
+                              🗑️
+                            </button>
+                          )}
+
+                          {/* Mensagem para o próprio usuário */}
+                          {isCurrentUser && (
+                            <span className="text-xs text-gray-400">Você não pode se modificar</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

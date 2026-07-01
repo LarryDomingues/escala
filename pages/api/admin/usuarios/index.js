@@ -12,19 +12,30 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Sem permissão. Apenas administradores podem acessar.' });
   }
 
-  await connectDB();
-
-  if (req.method === 'GET') {
-    try {
-      const usuarios = await Usuario.find()
-        .select('-senha -token_ativacao -token_recuperacao')
-        .sort({ data_cadastro: -1 });
-      return res.status(200).json(usuarios);
-    } catch (error) {
-      console.error('Erro ao buscar usuários:', error);
-      return res.status(500).json({ error: 'Erro ao buscar usuários' });
-    }
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Método não permitido' });
   }
 
-  return res.status(405).json({ error: 'Método não permitido' });
+  try {
+    await connectDB();
+
+    const usuarios = await Usuario.find()
+      .select('-senha -token_ativacao -token_recuperacao')
+      .sort({ data_cadastro: -1 });
+
+    const result = usuarios.map(u => ({
+      id: u._id,
+      nome: u.nome,
+      email: u.email,
+      nivel: u.nivel,
+      status: u.status,
+      ultimo_login: u.ultimo_login,
+      data_cadastro: u.data_cadastro,
+    }));
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('Erro ao buscar usuários:', error);
+    return res.status(500).json({ error: 'Erro ao buscar usuários' });
+  }
 }
