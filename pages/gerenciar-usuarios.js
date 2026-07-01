@@ -5,6 +5,7 @@ import axios from 'axios';
 
 export default function GerenciarUsuarios() {
   const router = useRouter();
+  const [user, setUser] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mensagem, setMensagem] = useState('');
@@ -13,8 +14,9 @@ export default function GerenciarUsuarios() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        await axios.get('/api/auth/me');
-        carregarUsuarios();
+        const res = await axios.get('/api/auth/me');
+        setUser(res.data);
+        await carregarUsuarios();
       } catch (error) {
         router.push('/login');
       }
@@ -86,6 +88,16 @@ export default function GerenciarUsuarios() {
     return new Date(data).toLocaleDateString('pt-BR') + ' ' + new Date(data).toLocaleTimeString('pt-BR');
   };
 
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex justify-center items-center h-64">
+          <div className="text-gray-500">Carregando...</div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="p-3 md:p-4 max-w-7xl mx-auto">
@@ -99,56 +111,52 @@ export default function GerenciarUsuarios() {
         )}
 
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          {loading ? (
-            <div className="flex justify-center items-center h-64"><div className="text-gray-500">Carregando...</div></div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs md:text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-2 md:px-4 py-2 text-left">Nome</th>
-                    <th className="px-2 md:px-4 py-2 text-left hidden sm:table-cell">Email</th>
-                    <th className="px-2 md:px-4 py-2 text-left">Nível</th>
-                    <th className="px-2 md:px-4 py-2 text-left">Status</th>
-                    <th className="px-2 md:px-4 py-2 text-left hidden md:table-cell">Último Login</th>
-                    <th className="px-2 md:px-4 py-2 text-center">Ações</th>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs md:text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-2 md:px-4 py-2 text-left">Nome</th>
+                  <th className="px-2 md:px-4 py-2 text-left hidden sm:table-cell">Email</th>
+                  <th className="px-2 md:px-4 py-2 text-left">Nível</th>
+                  <th className="px-2 md:px-4 py-2 text-left">Status</th>
+                  <th className="px-2 md:px-4 py-2 text-left hidden md:table-cell">Último Login</th>
+                  <th className="px-2 md:px-4 py-2 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {usuarios.map((usuario) => (
+                  <tr key={usuario.id} className="hover:bg-gray-50">
+                    <td className="px-2 md:px-4 py-2 font-medium text-gray-900">
+                      {usuario.nome}
+                      {user && usuario.id === user.id && <span className="ml-2 text-xs text-indigo-600">(Você)</span>}
+                    </td>
+                    <td className="px-2 md:px-4 py-2 text-gray-600 hidden sm:table-cell">{usuario.email}</td>
+                    <td className="px-2 md:px-4 py-2"><span className={getNivelBadge(usuario.nivel)}>{usuario.nivel}</span></td>
+                    <td className="px-2 md:px-4 py-2"><span className={getStatusBadge(usuario.status)}>{usuario.status}</span></td>
+                    <td className="px-2 md:px-4 py-2 text-gray-500 hidden md:table-cell">{formatarData(usuario.ultimo_login)}</td>
+                    <td className="px-2 md:px-4 py-2">
+                      <div className="flex flex-wrap items-center justify-center gap-1 md:gap-2">
+                        {usuario.status === 'pendente' && (!user || usuario.id !== user.id) && (
+                          <button onClick={() => handleAcao(usuario.id, 'ativar', usuario.nome)} className="btn-success text-xs px-2 py-1">Ativar</button>
+                        )}
+                        {usuario.status === 'ativo' && (!user || usuario.id !== user.id) && (
+                          <button onClick={() => handleAcao(usuario.id, 'bloquear', usuario.nome)} className="btn-danger text-xs px-2 py-1">Bloquear</button>
+                        )}
+                        {usuario.status === 'bloqueado' && (!user || usuario.id !== user.id) && (
+                          <button onClick={() => handleAcao(usuario.id, 'desbloquear', usuario.nome)} className="btn-success text-xs px-2 py-1">Desbloquear</button>
+                        )}
+                        {usuario.nivel !== 'admin' && (!user || usuario.id !== user.id) && (
+                          <button onClick={() => handlePromover(usuario.id, usuario.nivel, usuario.nome)} className="btn-warning text-xs px-2 py-1">
+                            {usuario.nivel === 'membro' ? '↑' : '↓'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {usuarios.map((usuario) => (
-                    <tr key={usuario.id} className="hover:bg-gray-50">
-                      <td className="px-2 md:px-4 py-2 font-medium text-gray-900">
-                        {usuario.nome}
-                        {usuario.id === user?.id && <span className="ml-2 text-xs text-indigo-600">(Você)</span>}
-                      </td>
-                      <td className="px-2 md:px-4 py-2 text-gray-600 hidden sm:table-cell">{usuario.email}</td>
-                      <td className="px-2 md:px-4 py-2"><span className={getNivelBadge(usuario.nivel)}>{usuario.nivel}</span></td>
-                      <td className="px-2 md:px-4 py-2"><span className={getStatusBadge(usuario.status)}>{usuario.status}</span></td>
-                      <td className="px-2 md:px-4 py-2 text-gray-500 hidden md:table-cell">{formatarData(usuario.ultimo_login)}</td>
-                      <td className="px-2 md:px-4 py-2">
-                        <div className="flex flex-wrap items-center justify-center gap-1 md:gap-2">
-                          {usuario.status === 'pendente' && usuario.id !== user?.id && (
-                            <button onClick={() => handleAcao(usuario.id, 'ativar', usuario.nome)} className="btn-success text-xs px-2 py-1">Ativar</button>
-                          )}
-                          {usuario.status === 'ativo' && usuario.id !== user?.id && (
-                            <button onClick={() => handleAcao(usuario.id, 'bloquear', usuario.nome)} className="btn-danger text-xs px-2 py-1">Bloquear</button>
-                          )}
-                          {usuario.status === 'bloqueado' && usuario.id !== user?.id && (
-                            <button onClick={() => handleAcao(usuario.id, 'desbloquear', usuario.nome)} className="btn-success text-xs px-2 py-1">Desbloquear</button>
-                          )}
-                          {usuario.nivel !== 'admin' && usuario.id !== user?.id && (
-                            <button onClick={() => handlePromover(usuario.id, usuario.nivel, usuario.nome)} className="btn-warning text-xs px-2 py-1">
-                              {usuario.nivel === 'membro' ? '↑' : '↓'}
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </Layout>
