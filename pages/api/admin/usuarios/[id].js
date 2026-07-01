@@ -23,14 +23,9 @@ export default async function handler(req, res) {
     try {
       const { acao, nivel, vincular_membro, desvincular_membro } = req.body;
 
-      // Validar ID
       if (!id) {
         return res.status(400).json({ error: 'ID do usuário é obrigatório' });
       }
-
-      // Permitir vincular o próprio admin também
-      // Removemos a restrição de não modificar o próprio usuário para vincular membro
-      const isSelf = id === user.id;
 
       const usuario = await Usuario.findById(id);
       if (!usuario) {
@@ -38,6 +33,7 @@ export default async function handler(req, res) {
       }
 
       let descricao = '';
+      let membroVinculado = null;
 
       // Vincular a um membro
       if (vincular_membro) {
@@ -56,12 +52,17 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: 'Este membro já está vinculado a outro usuário' });
         }
 
-        // Desvincular membro atual se existir
-        await Membro.updateMany({ usuario_id: id }, { usuario_id: null });
+        // Verificar se o usuário já tem um membro vinculado
+        const membroAtual = await Membro.findOne({ usuario_id: id });
+        if (membroAtual) {
+          membroAtual.usuario_id = null;
+          await membroAtual.save();
+        }
         
         // Vincular ao novo membro
         membro.usuario_id = id;
         await membro.save();
+        membroVinculado = membro;
         descricao = `Usuário ${usuario.nome} vinculado ao membro ${membro.nome}`;
       }
 
@@ -77,8 +78,8 @@ export default async function handler(req, res) {
         }
       }
 
-      // Ações de status - apenas se não for o próprio usuário
-      if (acao && !isSelf) {
+      // Ações de status
+      if (acao && id !== user.id) {
         const statusMap = {
           ativar: 'ativo',
           bloquear: 'bloqueado',
@@ -91,8 +92,8 @@ export default async function handler(req, res) {
         }
       }
 
-      // Mudar nível - apenas se não for o próprio usuário
-      if (nivel && !isSelf) {
+      // Mudar nível
+      if (nivel && id !== user.id) {
         if (!['membro', 'coordenador', 'admin'].includes(nivel)) {
           return res.status(400).json({ error: 'Nível inválido' });
         }
@@ -113,9 +114,16 @@ export default async function handler(req, res) {
         ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0',
       });
 
+      // Retornar os dados atualizados
+      const membroAtualizado = await Membro.findOne({ usuario_id: id }).select('_id nome');
+
       return res.status(200).json({
         success: true,
         message: 'Usuário atualizado com sucesso!',
+        membro: membroAtualizado ? {
+          id: membroAtualizado._id,
+          nome: membroAtualizado.nome,
+        } : null,
       });
     } catch (error) {
       console.error('Erro ao atualizar usuário:', error);
@@ -139,7 +147,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Não é possível deletar um administrador' });
       }
 
-      const nomeUsuario = usuario.nombre;
+      const nomeUsuario = usuario.nome;
 
       // Remover referência do membro se existir
       await Membro.updateMany({ usuario_id: id }, { usuario_id: null });

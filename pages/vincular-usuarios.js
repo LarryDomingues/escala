@@ -47,11 +47,20 @@ export default function VincularUsuarios() {
       const membrosRes = await axios.get('/api/membros');
       const todosMembros = membrosRes.data;
 
-      // Separar usuários com e sem vínculo
-      const vinculados = todosMembros.filter(m => m.usuario_id);
-      const naoVinculados = todosUsuarios.filter(u => 
-        !vinculados.some(v => v.usuario_id === u.id)
+      // Buscar usuários com membro vinculado
+      const usuariosComMembro = await Promise.all(
+        todosUsuarios.map(async (u) => {
+          const membro = todosMembros.find(m => m.usuario_id === u.id);
+          return {
+            ...u,
+            membro: membro || null,
+          };
+        })
       );
+
+      // Separar usuários com e sem vínculo
+      const vinculados = usuariosComMembro.filter(u => u.membro);
+      const naoVinculados = usuariosComMembro.filter(u => !u.membro);
 
       setUsuarios(naoVinculados);
       setMembros(todosMembros);
@@ -81,7 +90,6 @@ export default function VincularUsuarios() {
         return;
       }
 
-      // Permite vincular qualquer usuário, incluindo admin
       await axios.put(`/api/admin/usuarios/${usuario_id}`, {
         vincular_membro: membro_id,
       });
@@ -254,12 +262,18 @@ export default function VincularUsuarios() {
                         )}
                       </div>
                       <div className="text-sm text-gray-500">{item.email}</div>
-                      <div className="text-sm text-green-600">
-                        👤 Vinculado a: <strong>{item.membro_nome || 'N/A'}</strong>
-                      </div>
+                      {item.membro ? (
+                        <div className="text-sm text-green-600">
+                          👤 Vinculado a: <strong>{item.membro.nome}</strong>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-red-500">
+                          ⚠️ Erro: Membro não encontrado
+                        </div>
+                      )}
                     </div>
                     <button
-                      onClick={() => handleDesvincular(item.id, item.membro_nome || 'membro')}
+                      onClick={() => handleDesvincular(item.id, item.membro?.nome || 'membro')}
                       className="btn-danger text-sm px-3 py-1.5"
                     >
                       🔓 Desvincular

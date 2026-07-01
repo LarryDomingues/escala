@@ -1,5 +1,6 @@
 import connectDB from '../../../lib/mongodb';
 import Usuario from '../../../lib/models/Usuario';
+import Membro from '../../../lib/models/Membro';
 import { getUserFromToken } from '../../../lib/auth';
 
 export default async function handler(req, res) {
@@ -14,11 +15,16 @@ export default async function handler(req, res) {
     }
 
     await connectDB();
+    
+    // Buscar usuário
     const usuario = await Usuario.findById(user.id).select('-senha -token_ativacao -token_recuperacao');
 
     if (!usuario) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
+
+    // Buscar membro vinculado a este usuário
+    const membro = await Membro.findOne({ usuario_id: user.id }).select('_id nome');
 
     return res.status(200).json({
       id: usuario._id,
@@ -28,6 +34,10 @@ export default async function handler(req, res) {
       status: usuario.status,
       ultimo_login: usuario.ultimo_login,
       data_cadastro: usuario.data_cadastro,
+      membro: membro ? {
+        id: membro._id,
+        nome: membro.nome,
+      } : null,
     });
   } catch (error) {
     console.error('Erro ao buscar usuário:', error);
