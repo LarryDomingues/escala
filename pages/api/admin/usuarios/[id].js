@@ -1,5 +1,6 @@
 import connectDB from '../../../../lib/mongodb';
 import Usuario from '../../../../lib/models/Usuario';
+import Membro from '../../../../lib/models/Membro';
 import Log from '../../../../lib/models/Log';
 import { getUserFromToken } from '../../../../lib/auth';
 
@@ -20,11 +21,16 @@ export default async function handler(req, res) {
   // PUT - Atualizar usuário
   if (req.method === 'PUT') {
     try {
-      const { acao, nivel } = req.body;
+      const { acao, nivel, vincular_membro, desvincular_membro } = req.body;
 
-      if (!id || id === user.id) {
-        return res.status(400).json({ error: 'Não é possível modificar o próprio usuário' });
+      // Validar ID
+      if (!id) {
+        return res.status(400).json({ error: 'ID do usuário é obrigatório' });
       }
+
+      // Permitir vincular o próprio admin também
+      // Removemos a restrição de não modificar o próprio usuário para vincular membro
+      const isSelf = id === user.id;
 
       const usuario = await Usuario.findById(id);
       if (!usuario) {
@@ -33,8 +39,46 @@ export default async function handler(req, res) {
 
       let descricao = '';
 
-      // Ações de status
-      if (acao) {
+      // Vincular a um membro
+      if (vincular_membro) {
+        const membro = await Membro.findById(vincular_membro);
+        if (!membro) {
+          return res.status(404).json({ error: 'Membro não encontrado' });
+        }
+
+        // Verificar se o membro já está vinculado a outro usuário
+        const membroExistente = await Membro.findOne({ 
+          _id: vincular_membro,
+          usuario_id: { $ne: null }
+        });
+        
+        if (membroExistente) {
+          return res.status(400).json({ error: 'Este membro já está vinculado a outro usuário' });
+        }
+
+        // Desvincular membro atual se existir
+        await Membro.updateMany({ usuario_id: id }, { usuario_id: null });
+        
+        // Vincular ao novo membro
+        membro.usuario_id = id;
+        await membro.save();
+        descricao = `Usuário ${usuario.nome} vinculado ao membro ${membro.nome}`;
+      }
+
+      // Desvincular
+      if (desvincular_membro) {
+        const membro = await Membro.findOne({ usuario_id: id });
+        if (membro) {
+          membro.usuario_id = null;
+          await membro.save();
+          descricao = `Usuário ${usuario.nome} desvinculado do membro ${membro.nome}`;
+        } else {
+          return res.status(404).json({ error: 'Nenhum membro vinculado a este usuário' });
+        }
+      }
+
+      // Ações de status - apenas se não for o próprio usuário
+      if (acao && !isSelf) {
         const statusMap = {
           ativar: 'ativo',
           bloquear: 'bloqueado',
@@ -42,19 +86,24 @@ export default async function handler(req, res) {
         };
         if (statusMap[acao]) {
           usuario.status = statusMap[acao];
-          descricao = `Usuário ${usuario.nome} foi ${acao}do`;
+          descricao = descricao || `Usuário ${usuario.nome} foi ${acao}do`;
           await usuario.save();
         }
       }
 
-      // Mudar nível
-      if (nivel) {
+      // Mudar nível - apenas se não for o próprio usuário
+      if (nivel && !isSelf) {
         if (!['membro', 'coordenador', 'admin'].includes(nivel)) {
           return res.status(400).json({ error: 'Nível inválido' });
         }
         usuario.nivel = nivel;
         descricao = descricao || `Usuário ${usuario.nome} foi alterado para ${nivel}`;
         await usuario.save();
+      }
+
+      // Se não houve nenhuma ação, retornar erro
+      if (!descricao) {
+        return res.status(400).json({ error: 'Nenhuma ação foi realizada' });
       }
 
       await Log.create({
@@ -90,7 +139,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Não é possível deletar um administrador' });
       }
 
-      const nomeUsuario = usuario.nome;
+      const nomeUsuario = usuario.nombre;
 
       // Remover referência do membro se existir
       await Membro.updateMany({ usuario_id: id }, { usuario_id: null });

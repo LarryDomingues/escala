@@ -5,6 +5,7 @@ import axios from 'axios';
 
 export default function VincularUsuarios() {
   const router = useRouter();
+  const [user, setUser] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
   const [membros, setMembros] = useState([]);
   const [usuariosVinculados, setUsuariosVinculados] = useState([]);
@@ -13,7 +14,6 @@ export default function VincularUsuarios() {
   const [mensagem, setMensagem] = useState('');
   const [mensagemTipo, setMensagemTipo] = useState('');
 
-  // Estado do formulário
   const [form, setForm] = useState({
     usuario_id: '',
     membro_id: '',
@@ -23,6 +23,7 @@ export default function VincularUsuarios() {
     const checkAuth = async () => {
       try {
         const res = await axios.get('/api/auth/me');
+        setUser(res.data);
         if (res.data.nivel !== 'admin') {
           router.push('/');
           return;
@@ -80,6 +81,7 @@ export default function VincularUsuarios() {
         return;
       }
 
+      // Permite vincular qualquer usuário, incluindo admin
       await axios.put(`/api/admin/usuarios/${usuario_id}`, {
         vincular_membro: membro_id,
       });
@@ -149,9 +151,11 @@ export default function VincularUsuarios() {
           <p className="text-blue-700 text-sm font-medium">ℹ️ Sobre a Vinculação:</p>
           <p className="text-blue-600 text-xs md:text-sm">
             Vincular um usuário a um membro permite que o sistema identifique qual membro está logado.
-            Isso é útil para destacar o nome do usuário na escala e personalizar a experiência.
+            Isso permite destacar o nome do usuário na escala e personalizar a experiência.
           </p>
-          <p className="text-blue-600 text-xs md:text-sm mt-1">💡 Um membro só pode ser vinculado a um único usuário.</p>
+          <p className="text-blue-600 text-xs md:text-sm mt-1">
+            💡 <strong>Administradores também podem ser vinculados</strong> a membros para aparecerem destacados na escala.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
@@ -181,9 +185,10 @@ export default function VincularUsuarios() {
                     required
                   >
                     <option value="">-- Selecione um usuário --</option>
-                    {usuarios.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.nome} ({user.email}) - {user.nivel}
+                    {usuarios.map((usuario) => (
+                      <option key={usuario.id} value={usuario.id}>
+                        {usuario.nome} ({usuario.email}) - {usuario.nivel}
+                        {user && usuario.id === user.id && ' (Você)'}
                       </option>
                     ))}
                   </select>
@@ -244,6 +249,9 @@ export default function VincularUsuarios() {
                         <span className="font-medium text-gray-800">{item.nome}</span>
                         <span className={getNivelBadge(item.nivel)}>{item.nivel}</span>
                         <span className={getStatusBadge(item.status)}>{item.status}</span>
+                        {user && item.id === user.id && (
+                          <span className="text-xs text-indigo-600 font-medium">(Você)</span>
+                        )}
                       </div>
                       <div className="text-sm text-gray-500">{item.email}</div>
                       <div className="text-sm text-green-600">
@@ -278,6 +286,17 @@ export default function VincularUsuarios() {
             <div className="text-xs md:text-sm text-gray-500">Total de membros</div>
           </div>
         </div>
+
+        {/* Dica para Admin */}
+        {user && user.nivel === 'admin' && (
+          <div className="mt-4 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+            <p className="text-sm text-indigo-700">
+              💡 <strong>Dica:</strong> Como administrador, você também pode se vincular a um membro.
+              Basta selecionar seu usuário na lista e escolher um membro para vincular.
+              Isso fará seu nome aparecer destacado na escala.
+            </p>
+          </div>
+        )}
       </div>
     </Layout>
   );
