@@ -8,6 +8,7 @@ import { ptBR } from 'date-fns/locale';
 export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [membroLogado, setMembroLogado] = useState(null);
   const [escalas, setEscalas] = useState([]);
   const [proximos, setProximos] = useState([]);
   const [totalMembros, setTotalMembros] = useState(0);
@@ -18,6 +19,12 @@ export default function Dashboard() {
       try {
         const res = await axios.get('/api/auth/me');
         setUser(res.data);
+        
+        // Buscar o membro vinculado ao usuário
+        if (res.data) {
+          await buscarMembroLogado(res.data.id);
+        }
+        
         await loadData();
       } catch (error) {
         router.push('/login');
@@ -27,6 +34,17 @@ export default function Dashboard() {
     };
     checkAuth();
   }, []);
+
+  const buscarMembroLogado = async (usuarioId) => {
+    try {
+      const res = await axios.get('/api/membros');
+      const membros = res.data;
+      const membro = membros.find(m => m.usuario_id === usuarioId);
+      setMembroLogado(membro || null);
+    } catch (error) {
+      console.error('Erro ao buscar membro logado:', error);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -59,6 +77,24 @@ export default function Dashboard() {
     return link;
   };
 
+  // Função para verificar se o membro é o usuário logado
+  const isUsuarioLogado = (membroId) => {
+    if (!membroLogado) return false;
+    return membroLogado.id === membroId;
+  };
+
+  // Função para formatar o nome com destaque
+  const formatarNomeMembro = (nome, membroId) => {
+    if (isUsuarioLogado(membroId)) {
+      return (
+        <span className="membro-destaque">
+          ⭐ {nome} <span className="badge-eu">(EU)</span>
+        </span>
+      );
+    }
+    return <span className="membro-nome">{nome}</span>;
+  };
+
   const eventosHoje = escalas.filter(e => e.data === format(new Date(), 'yyyy-MM-dd'));
 
   if (loading) {
@@ -75,6 +111,46 @@ export default function Dashboard() {
     <Layout>
       <div className="p-3 md:p-4 max-w-7xl mx-auto">
         <h1 className="text-xl md:text-2xl font-bold text-gray-800 mb-4 md:mb-6">📊 Dashboard</h1>
+
+        {/* Informação do Usuário Logado */}
+        {membroLogado ? (
+          <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-3 md:p-4 rounded-lg mb-4 md:mb-6 border-l-4 border-orange-400">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-2xl">⭐</span>
+              <div>
+                <p className="font-medium text-orange-800 text-sm md:text-base">
+                  Você está destacado na escala como <strong>{membroLogado.nome}</strong>
+                  {user?.nivel === 'admin' && (
+                    <span className="ml-2 text-xs text-gray-500">(Administrador)</span>
+                  )}
+                  {user?.nivel === 'coordenador' && (
+                    <span className="ml-2 text-xs text-gray-500">(Coordenador)</span>
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-gray-50 p-3 md:p-4 rounded-lg mb-4 md:mb-6 border-l-4 border-gray-400">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-2xl">ℹ️</span>
+              <div>
+                <p className="text-gray-600 text-sm md:text-base">
+                  Você não está vinculado a nenhum membro. Peça ao administrador para vincular seu usuário a um membro.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Legenda de Destaque */}
+        <div className="bg-yellow-50 p-3 md:p-4 rounded-lg mb-4 md:mb-6 border border-yellow-200 flex items-center gap-3 flex-wrap">
+          <span className="font-medium text-yellow-800">📌 Legenda:</span>
+          <span className="inline-block bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold animate-pulse">
+            ⭐ Nome do Membro <span className="bg-white/30 px-1.5 py-0.5 rounded text-xs">(EU)</span>
+          </span>
+          <span className="text-sm text-yellow-800">→ Seu nome aparece destacado em <strong>laranja</strong> com efeito <strong>pulsante</strong></span>
+        </div>
 
         {/* Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">
@@ -117,29 +193,51 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {proximos.map((e, i) => (
-                    <tr key={i} className="border-t hover:bg-gray-50">
-                      <td className="px-2 md:px-4 py-2 font-medium whitespace-nowrap">{formatarData(e.data)}</td>
-                      <td className="px-2 md:px-4 py-2 text-indigo-600 hidden sm:table-cell whitespace-nowrap">{e.dia_semana}</td>
-                      <td className="px-2 md:px-4 py-2 hidden md:table-cell">{e.voz_nome || '--'}</td>
-                      <td className="px-2 md:px-4 py-2 hidden md:table-cell">{e.violao_nome || '--'}</td>
-                      <td className="px-2 md:px-4 py-2 hidden lg:table-cell">{e.guitarra_nome || '--'}</td>
-                      <td className="px-2 md:px-4 py-2 hidden xl:table-cell">{e.baixo_nome || '--'}</td>
-                      <td className="px-2 md:px-4 py-2 hidden xl:table-cell">{e.bateria_nome || '--'}</td>
-                      <td className="px-2 md:px-4 py-2 text-center">
-                        {e.link_youtube && (
-                          <a
-                            href={getYouTubeLink(e.link_youtube)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-block px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs md:text-sm"
-                          >
-                            ▶️
-                          </a>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {proximos.map((e, i) => {
+                    // Verificar se o membro logado está nesta escala
+                    const estaEscalado = membroLogado && (
+                      e.voz_id === membroLogado.id ||
+                      e.voz2_id === membroLogado.id ||
+                      e.violao_id === membroLogado.id ||
+                      e.guitarra_id === membroLogado.id ||
+                      e.baixo_id === membroLogado.id ||
+                      e.bateria_id === membroLogado.id ||
+                      e.teclado_id === membroLogado.id
+                    );
+                    return (
+                      <tr key={i} className={`border-t hover:bg-gray-50 ${estaEscalado ? 'bg-yellow-50' : ''}`}>
+                        <td className="px-2 md:px-4 py-2 font-medium whitespace-nowrap">{formatarData(e.data)}</td>
+                        <td className="px-2 md:px-4 py-2 text-indigo-600 hidden sm:table-cell whitespace-nowrap">{e.dia_semana}</td>
+                        <td className="px-2 md:px-4 py-2 hidden md:table-cell">
+                          {e.voz_nome ? formatarNomeMembro(e.voz_nome, e.voz_id) : '--'}
+                        </td>
+                        <td className="px-2 md:px-4 py-2 hidden md:table-cell">
+                          {e.violao_nome ? formatarNomeMembro(e.violao_nome, e.violao_id) : '--'}
+                        </td>
+                        <td className="px-2 md:px-4 py-2 hidden lg:table-cell">
+                          {e.guitarra_nome ? formatarNomeMembro(e.guitarra_nome, e.guitarra_id) : '--'}
+                        </td>
+                        <td className="px-2 md:px-4 py-2 hidden xl:table-cell">
+                          {e.baixo_nome ? formatarNomeMembro(e.baixo_nome, e.baixo_id) : '--'}
+                        </td>
+                        <td className="px-2 md:px-4 py-2 hidden xl:table-cell">
+                          {e.bateria_nome ? formatarNomeMembro(e.bateria_nome, e.bateria_id) : '--'}
+                        </td>
+                        <td className="px-2 md:px-4 py-2 text-center">
+                          {e.link_youtube && (
+                            <a
+                              href={getYouTubeLink(e.link_youtube)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs md:text-sm"
+                            >
+                              ▶️
+                            </a>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -171,36 +269,104 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {escalas.map((e, i) => (
-                  <tr key={i} className="border-t hover:bg-gray-50">
-                    <td className="px-2 md:px-4 py-2 font-medium whitespace-nowrap">{formatarData(e.data)}</td>
-                    <td className="px-2 md:px-4 py-2 text-indigo-600 hidden sm:table-cell whitespace-nowrap">{e.dia_semana}</td>
-                    <td className="px-2 md:px-4 py-2 hidden md:table-cell">{e.voz_nome || '--'}</td>
-                    <td className="px-2 md:px-4 py-2 hidden lg:table-cell">{e.voz2_nome || '--'}</td>
-                    <td className="px-2 md:px-4 py-2 hidden md:table-cell">{e.violao_nome || '--'}</td>
-                    <td className="px-2 md:px-4 py-2 hidden xl:table-cell">{e.guitarra_nome || '--'}</td>
-                    <td className="px-2 md:px-4 py-2 hidden xl:table-cell">{e.baixo_nome || '--'}</td>
-                    <td className="px-2 md:px-4 py-2 hidden xl:table-cell">{e.bateria_nome || '--'}</td>
-                    <td className="px-2 md:px-4 py-2 hidden 2xl:table-cell">{e.teclado_nome || '--'}</td>
-                    <td className="px-2 md:px-4 py-2 text-center">
-                      {e.link_youtube && (
-                        <a
-                          href={getYouTubeLink(e.link_youtube)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-block px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs md:text-sm"
-                        >
-                          ▶️
-                        </a>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {escalas.map((e, i) => {
+                  const estaEscalado = membroLogado && (
+                    e.voz_id === membroLogado.id ||
+                    e.voz2_id === membroLogado.id ||
+                    e.violao_id === membroLogado.id ||
+                    e.guitarra_id === membroLogado.id ||
+                    e.baixo_id === membroLogado.id ||
+                    e.bateria_id === membroLogado.id ||
+                    e.teclado_id === membroLogado.id
+                  );
+                  return (
+                    <tr key={i} className={`border-t hover:bg-gray-50 ${estaEscalado ? 'bg-yellow-50' : ''}`}>
+                      <td className="px-2 md:px-4 py-2 font-medium whitespace-nowrap">{formatarData(e.data)}</td>
+                      <td className="px-2 md:px-4 py-2 text-indigo-600 hidden sm:table-cell whitespace-nowrap">{e.dia_semana}</td>
+                      <td className="px-2 md:px-4 py-2 hidden md:table-cell">
+                        {e.voz_nome ? formatarNomeMembro(e.voz_nome, e.voz_id) : '--'}
+                      </td>
+                      <td className="px-2 md:px-4 py-2 hidden lg:table-cell">
+                        {e.voz2_nome ? formatarNomeMembro(e.voz2_nome, e.voz2_id) : '--'}
+                      </td>
+                      <td className="px-2 md:px-4 py-2 hidden md:table-cell">
+                        {e.violao_nome ? formatarNomeMembro(e.violao_nome, e.violao_id) : '--'}
+                      </td>
+                      <td className="px-2 md:px-4 py-2 hidden xl:table-cell">
+                        {e.guitarra_nome ? formatarNomeMembro(e.guitarra_nome, e.guitarra_id) : '--'}
+                      </td>
+                      <td className="px-2 md:px-4 py-2 hidden xl:table-cell">
+                        {e.baixo_nome ? formatarNomeMembro(e.baixo_nome, e.baixo_id) : '--'}
+                      </td>
+                      <td className="px-2 md:px-4 py-2 hidden xl:table-cell">
+                        {e.bateria_nome ? formatarNomeMembro(e.bateria_nome, e.bateria_id) : '--'}
+                      </td>
+                      <td className="px-2 md:px-4 py-2 hidden 2xl:table-cell">
+                        {e.teclado_nome ? formatarNomeMembro(e.teclado_nome, e.teclado_id) : '--'}
+                      </td>
+                      <td className="px-2 md:px-4 py-2 text-center">
+                        {e.link_youtube && (
+                          <a
+                            href={getYouTubeLink(e.link_youtube)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs md:text-sm"
+                          >
+                            ▶️
+                          </a>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       </div>
+
+      {/* Estilos para o destaque pulsante */}
+      <style jsx global>{`
+        .membro-destaque {
+          display: inline-block;
+          background: linear-gradient(135deg, #f6ad55 0%, #ed8936 100%);
+          color: white;
+          padding: 2px 10px;
+          border-radius: 20px;
+          font-weight: 700;
+          font-size: 13px;
+          animation: pulse-destaque 2s ease-in-out infinite;
+          box-shadow: 0 2px 10px rgba(237, 137, 54, 0.3);
+          border: 2px solid #dd6b20;
+        }
+        .membro-destaque .badge-eu {
+          background: rgba(255,255,255,0.3);
+          padding: 1px 6px;
+          border-radius: 12px;
+          font-size: 9px;
+          font-weight: 600;
+          margin-left: 4px;
+          color: white;
+          text-transform: uppercase;
+        }
+        @keyframes pulse-destaque {
+          0% {
+            transform: scale(1);
+            box-shadow: 0 2px 10px rgba(237, 137, 54, 0.3);
+          }
+          50% {
+            transform: scale(1.05);
+            box-shadow: 0 4px 20px rgba(237, 137, 54, 0.5);
+          }
+          100% {
+            transform: scale(1);
+            box-shadow: 0 2px 10px rgba(237, 137, 54, 0.3);
+          }
+        }
+        .bg-yellow-50 {
+          background-color: #fffbeb !important;
+        }
+      `}</style>
     </Layout>
   );
 }
