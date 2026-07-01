@@ -1,5 +1,7 @@
+// pages/api/membros/[id].js
 import connectDB from '../../../lib/mongodb';
 import Membro from '../../../lib/models/Membro';
+import Habilidade from '../../../lib/models/Habilidade';
 import Log from '../../../lib/models/Log';
 import { getUserFromToken } from '../../../lib/auth';
 
@@ -13,20 +15,23 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Sem permissão' });
   }
 
-  await connectDB();
+  try {
+    await connectDB();
 
-  const { id } = req.query;
+    const { id } = req.query;
 
-  // Validar ID
-  if (!id || id === 'undefined' || id === 'null') {
-    return res.status(400).json({ error: 'ID do membro inválido' });
-  }
+    if (!id || id === 'undefined' || id === 'null') {
+      return res.status(400).json({ error: 'ID do membro inválido' });
+    }
 
-  // GET - Buscar membro
-  if (req.method === 'GET') {
-    try {
+    // GET - Buscar membro
+    if (req.method === 'GET') {
       const membro = await Membro.findById(id)
-        .populate('habilidade_ids', 'nome')
+        .populate({
+          path: 'habilidade_ids',
+          model: 'Habilidade',
+          select: 'nome',
+        })
         .populate('criado_por', 'nome');
 
       if (!membro) {
@@ -41,15 +46,10 @@ export default async function handler(req, res) {
         data_nascimento: membro.data_nascimento || '',
         habilidade_ids: membro.habilidade_ids?.map(h => h._id.toString()) || [],
       });
-    } catch (error) {
-      console.error('Erro ao buscar membro:', error);
-      return res.status(500).json({ error: 'Erro ao buscar membro' });
     }
-  }
 
-  // PUT - Atualizar membro
-  if (req.method === 'PUT') {
-    try {
+    // PUT - Atualizar membro
+    if (req.method === 'PUT') {
       const { nome, celular, email, data_nascimento, habilidade_ids } = req.body;
 
       if (!nome || nome.trim() === '') {
@@ -86,15 +86,10 @@ export default async function handler(req, res) {
         success: true,
         message: 'Membro atualizado com sucesso!',
       });
-    } catch (error) {
-      console.error('Erro ao atualizar membro:', error);
-      return res.status(500).json({ error: 'Erro ao atualizar membro' });
     }
-  }
 
-  // DELETE - Excluir membro
-  if (req.method === 'DELETE') {
-    try {
+    // DELETE - Excluir membro
+    if (req.method === 'DELETE') {
       const membro = await Membro.findById(id);
       if (!membro) {
         return res.status(404).json({ error: 'Membro não encontrado' });
@@ -114,12 +109,14 @@ export default async function handler(req, res) {
         success: true,
         message: 'Membro excluído com sucesso!',
       });
-    } catch (error) {
-      console.error('Erro ao excluir membro:', error);
-      return res.status(500).json({ error: 'Erro ao excluir membro' });
     }
-  }
 
-  // Qualquer outro método
-  return res.status(405).json({ error: 'Método não permitido' });
+    return res.status(405).json({ error: 'Método não permitido' });
+  } catch (error) {
+    console.error('Erro ao processar membro:', error);
+    return res.status(500).json({ 
+      error: 'Erro ao processar membro',
+      details: error.message,
+    });
+  }
 }
