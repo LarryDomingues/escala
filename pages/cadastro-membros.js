@@ -1,4 +1,3 @@
-// pages/cadastro-membros.js - Versão corrigida
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
@@ -6,10 +5,12 @@ import axios from 'axios';
 
 export default function CadastroMembros() {
   const router = useRouter();
+  const [user, setUser] = useState(null);
   const [membros, setMembros] = useState([]);
   const [habilidades, setHabilidades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  const [acaoMembro, setAcaoMembro] = useState(null);
 
   const [form, setForm] = useState({
     id: null,
@@ -27,7 +28,12 @@ export default function CadastroMembros() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        await axios.get('/api/auth/me');
+        const res = await axios.get('/api/auth/me');
+        setUser(res.data);
+        if (res.data.nivel !== 'admin' && res.data.nivel !== 'coordenador') {
+          router.push('/');
+          return;
+        }
         carregarDados();
       } catch (error) {
         router.push('/login');
@@ -75,7 +81,6 @@ export default function CadastroMembros() {
     setMensagemTipo('');
 
     try {
-      // Validar nome
       if (!form.nome || form.nome.trim() === '') {
         setMensagem('Nome é obrigatório');
         setMensagemTipo('error');
@@ -93,12 +98,10 @@ export default function CadastroMembros() {
 
       let response;
       if (editando && form.id) {
-        // Editar
         response = await axios.put(`/api/membros/${form.id}`, dados);
         setMensagem(response.data.message || 'Membro atualizado com sucesso!');
         setMensagemTipo('success');
       } else {
-        // Novo
         response = await axios.post('/api/membros', dados);
         setMensagem(response.data.message || 'Membro cadastrado com sucesso!');
         setMensagemTipo('success');
@@ -106,7 +109,6 @@ export default function CadastroMembros() {
 
       resetForm();
       await carregarDados();
-
     } catch (error) {
       console.error('Erro ao salvar:', error);
       const errorMsg = error.response?.data?.error || error.response?.data?.message || 'Erro ao salvar membro';
@@ -122,7 +124,6 @@ export default function CadastroMembros() {
       setLoading(true);
       const res = await axios.get(`/api/membros/${id}`);
       const membro = res.data;
-      
       setForm({
         id: membro.id,
         nome: membro.nome || '',
@@ -132,8 +133,6 @@ export default function CadastroMembros() {
         habilidades: membro.habilidade_ids || [],
       });
       setEditando(true);
-      
-      // Scroll para o formulário
       document.getElementById('form-membro')?.scrollIntoView({ behavior: 'smooth' });
     } catch (error) {
       console.error('Erro ao buscar membro:', error);
@@ -159,6 +158,62 @@ export default function CadastroMembros() {
     }
   };
 
+  // ========== NOVAS AÇÕES ==========
+  
+  // Ativar conta do membro (cria usuário)
+  const handleAtivarConta = async (id, nome, email) => {
+    if (!email) {
+      setMensagem(`O membro "${nome}" não possui email cadastrado para criar uma conta.`);
+      setMensagemTipo('error');
+      return;
+    }
+
+    if (!confirm(`Tem certeza que deseja ativar a conta do membro "${nome}"? Um usuário será criado com o email ${email}.`)) return;
+
+    try {
+      const response = await axios.post(`/api/membros/${id}/ativar-conta`);
+      setMensagem(response.data.message || `Conta ativada com sucesso para ${nome}!`);
+      setMensagemTipo('success');
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao ativar conta:', error);
+      setMensagem(error.response?.data?.error || 'Erro ao ativar conta');
+      setMensagemTipo('error');
+    }
+  };
+
+  // Bloquear membro (bloqueia o usuário vinculado)
+  const handleBloquearMembro = async (id, nome) => {
+    if (!confirm(`Tem certeza que deseja bloquear o membro "${nome}"?`)) return;
+
+    try {
+      const response = await axios.post(`/api/membros/${id}/bloquear`);
+      setMensagem(response.data.message || `Membro ${nome} bloqueado com sucesso!`);
+      setMensagemTipo('success');
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao bloquear membro:', error);
+      setMensagem(error.response?.data?.error || 'Erro ao bloquear membro');
+      setMensagemTipo('error');
+    }
+  };
+
+  // Desbloquear membro
+  const handleDesbloquearMembro = async (id, nome) => {
+    if (!confirm(`Tem certeza que deseja desbloquear o membro "${nome}"?`)) return;
+
+    try {
+      const response = await axios.post(`/api/membros/${id}/desbloquear`);
+      setMensagem(response.data.message || `Membro ${nome} desbloqueado com sucesso!`);
+      setMensagemTipo('success');
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao desbloquear membro:', error);
+      setMensagem(error.response?.data?.error || 'Erro ao desbloquear membro');
+      setMensagemTipo('error');
+    }
+  };
+
   const resetForm = () => {
     setForm({
       id: null,
@@ -173,6 +228,18 @@ export default function CadastroMembros() {
 
   const cancelarEdicao = () => {
     resetForm();
+  };
+
+  // Verificar se o membro tem usuário vinculado
+  const temUsuario = (membro) => {
+    return membro.usuario_id && membro.usuario_sistema !== 'Sem usuário';
+  };
+
+  // Verificar se o membro está ativo (se tiver usuário e estiver ativo)
+  const isAtivo = (membro) => {
+    // Por enquanto, consideramos que se tem usuário, está ativo
+    // Isso pode ser expandido com o status do usuário
+    return temUsuario(membro);
   };
 
   return (
@@ -321,7 +388,8 @@ export default function CadastroMembros() {
                     <th className="px-2 md:px-4 py-2 text-left hidden sm:table-cell">Celular</th>
                     <th className="px-2 md:px-4 py-2 text-left hidden md:table-cell">Email</th>
                     <th className="px-2 md:px-4 py-2 text-left">Habilidades</th>
-                    <th className="px-2 md:px-4 py-2 text-center">Ações</th>
+                    <th className="px-2 md:px-4 py-2 text-left hidden lg:table-cell">Usuário</th>
+                    <th className="px-2 md:px-4 py-2 text-center min-w-[180px]">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -341,22 +409,73 @@ export default function CadastroMembros() {
                           <span className="text-gray-400 text-sm">Nenhuma</span>
                         )}
                       </td>
-                      <td className="px-2 md:px-4 py-2 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleEdit(membro.id)}
-                            className="p-1.5 text-yellow-600 hover:bg-yellow-50 rounded-lg transition"
-                            title="Editar"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={() => handleDelete(membro.id, membro.nome)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
-                            title="Excluir"
-                          >
-                            🗑️
-                          </button>
+                      <td className="px-2 md:px-4 py-2 hidden lg:table-cell">
+                        {membro.usuario_id ? (
+                          <span className="inline-flex items-center gap-1 text-green-600">
+                            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                            {membro.usuario_sistema || 'Usuário'}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-sm">Sem usuário</span>
+                        )}
+                      </td>
+                      <td className="px-2 md:px-4 py-2">
+                        <div className="flex flex-wrap items-center justify-center gap-1">
+                          {/* Editar - Admin e Coordenador */}
+                          {(user?.nivel === 'admin' || user?.nivel === 'coordenador') && (
+                            <button
+                              onClick={() => handleEdit(membro.id)}
+                              className="p-1.5 text-yellow-600 hover:bg-yellow-50 rounded-lg transition"
+                              title="Editar"
+                            >
+                              ✏️
+                            </button>
+                          )}
+                          
+                          {/* Ativar Conta - Admin apenas, e somente se não tiver usuário */}
+                          {user?.nivel === 'admin' && !membro.usuario_id && (
+                            <button
+                              onClick={() => handleAtivarConta(membro.id, membro.nome, membro.email)}
+                              className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition"
+                              title="Ativar Conta (criar usuário)"
+                            >
+                              ✅
+                            </button>
+                          )}
+                          
+                          {/* Bloquear - Admin apenas, e somente se tiver usuário */}
+                          {user?.nivel === 'admin' && membro.usuario_id && (
+                            <button
+                              onClick={() => handleBloquearMembro(membro.id, membro.nome)}
+                              className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg transition"
+                              title="Bloquear"
+                            >
+                              🔒
+                            </button>
+                          )}
+                          
+                          {/* Desbloquear - Admin apenas, e somente se tiver usuário (seria necessário verificar status) */}
+                          {/* Por enquanto, apenas um botão de desbloquear genérico */}
+                          {user?.nivel === 'admin' && membro.usuario_id && (
+                            <button
+                              onClick={() => handleDesbloquearMembro(membro.id, membro.nome)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                              title="Desbloquear"
+                            >
+                              🔓
+                            </button>
+                          )}
+                          
+                          {/* Excluir - Admin e Coordenador */}
+                          {(user?.nivel === 'admin' || user?.nivel === 'coordenador') && (
+                            <button
+                              onClick={() => handleDelete(membro.id, membro.nome)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
+                              title="Excluir"
+                            >
+                              🗑️
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -365,6 +484,16 @@ export default function CadastroMembros() {
               </table>
             </div>
           )}
+        </div>
+
+        {/* Legenda das ações */}
+        <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 flex flex-wrap gap-4">
+          <span>📌 <strong>Legenda das ações:</strong></span>
+          <span>✏️ Editar</span>
+          <span className="text-green-600">✅ Ativar Conta</span>
+          <span className="text-orange-600">🔒 Bloquear</span>
+          <span className="text-blue-600">🔓 Desbloquear</span>
+          <span className="text-red-600">🗑️ Excluir</span>
         </div>
       </div>
     </Layout>
