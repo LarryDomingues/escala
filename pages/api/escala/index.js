@@ -1,15 +1,16 @@
 import connectDB from '../../../lib/mongodb';
 import Escala from '../../../lib/models/Escala';
-import Log from '../../../lib/models/Log';
 import { getUserFromToken } from '../../../lib/auth';
+
+// Cache para escalas
+const escalaCache = new Map();
+const ESCALA_CACHE_TTL = 60000; // 1 minuto
 
 export default async function handler(req, res) {
   const user = getUserFromToken(req);
   if (!user) {
     return res.status(401).json({ error: 'Não autenticado' });
   }
-
-  await connectDB();
 
   if (req.method === 'GET') {
     try {
@@ -18,6 +19,15 @@ export default async function handler(req, res) {
       if (!mes) {
         return res.status(400).json({ error: 'Mês é obrigatório' });
       }
+
+      // Verificar cache
+      const cacheKey = `escala_${mes}_${user.nivel}`;
+      const cachedData = escalaCache.get(cacheKey);
+      if (cachedData && Date.now() - cachedData.timestamp < ESCALA_CACHE_TTL) {
+        return res.status(200).json(cachedData.data);
+      }
+
+      await connectDB();
 
       const [ano, mesNum] = mes.split('-');
       const startDate = `${ano}-${mesNum}-01`;
@@ -34,7 +44,8 @@ export default async function handler(req, res) {
       .populate('baixo_id', 'nome')
       .populate('bateria_id', 'nome')
       .populate('teclado_id', 'nome')
-      .sort({ data: 1 });
+      .sort({ data: 1 })
+      .lean();
 
       const result = escalas.map(escala => ({
         id: escala._id,
@@ -57,6 +68,12 @@ export default async function handler(req, res) {
         link_youtube: escala.link_youtube || null,
       }));
 
+      // Armazenar em cache
+      escalaCache.set(cacheKey, {
+        data: result,
+        timestamp: Date.now()
+      });
+
       return res.status(200).json(result);
     } catch (error) {
       console.error('Erro ao buscar escala:', error);
@@ -66,3 +83,13 @@ export default async function handler(req, res) {
 
   return res.status(405).json({ error: 'Método não permitido' });
 }
+
+// Limpar cache periodicamente
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of escalaCache) {
+    if (now - value.timestamp > ESCALA_CACHE_TTL) {
+      escalaCache.delete(key);
+    }
+  }
+}, ESCALA_CACHE_TTL);
