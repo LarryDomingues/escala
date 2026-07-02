@@ -1,6 +1,6 @@
 // pages/api/membros/habilidades.js
 import connectDB from '../../../lib/mongodb';
-import Habilidade from '../../../lib/models/Habilidade';
+import { Habilidade } from '../../../lib/models';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -10,13 +10,13 @@ export default async function handler(req, res) {
   try {
     await connectDB();
 
-    let habilidades = await Habilidade.find().sort({ nome: 1 });
+    let habilidades = await Habilidade.find().sort({ nome: 1 }).lean();
     
     // Se não houver habilidades no banco, criar as padrão
     if (habilidades.length === 0) {
       const habilidadesPadrao = ['Voz', 'Voz2', 'Violão', 'Guitarra', 'Baixo', 'Bateria', 'Teclado'];
       await Habilidade.insertMany(habilidadesPadrao.map(nome => ({ nome })));
-      habilidades = await Habilidade.find().sort({ nome: 1 });
+      habilidades = await Habilidade.find().sort({ nome: 1 }).lean();
     }
 
     const result = habilidades.map(h => ({

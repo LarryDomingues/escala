@@ -1,6 +1,6 @@
+// pages/api/membros/[id].js
 import connectDB from '../../../lib/mongodb';
-import Membro from '../../../lib/models/Membro';
-import Log from '../../../lib/models/Log';
+import { Membro, Habilidade, Log } from '../../../lib/models';
 import { getUserFromToken } from '../../../lib/auth';
 
 export default async function handler(req, res) {
@@ -30,7 +30,8 @@ export default async function handler(req, res) {
           model: 'Habilidade',
           select: 'nome',
         })
-        .populate('criado_por', 'nome');
+        .populate('criado_por', 'nome')
+        .lean();
 
       if (!membro) {
         return res.status(404).json({ error: 'Membro não encontrado' });
@@ -55,18 +56,15 @@ export default async function handler(req, res) {
     try {
       const { nome, celular, email, data_nascimento, habilidades } = req.body;
 
-      // Validação
       if (!nome || nome.trim() === '') {
         return res.status(400).json({ error: 'Nome é obrigatório' });
       }
 
-      // Buscar o membro
       const membro = await Membro.findById(id);
       if (!membro) {
         return res.status(404).json({ error: 'Membro não encontrado' });
       }
 
-      // Preparar dados para atualização
       const updateData = {
         nome: nome.trim(),
         celular: celular || '',
@@ -76,18 +74,12 @@ export default async function handler(req, res) {
         updatedAt: new Date(),
       };
 
-      // Atualizar o membro
       const updatedMembro = await Membro.findByIdAndUpdate(
         id,
         updateData,
         { new: true, runValidators: true }
       );
 
-      if (!updatedMembro) {
-        return res.status(404).json({ error: 'Erro ao atualizar membro' });
-      }
-
-      // Registrar log
       await Log.create({
         usuario_id: user.id,
         acao: 'edicao_membro',
@@ -98,17 +90,10 @@ export default async function handler(req, res) {
       return res.status(200).json({
         success: true,
         message: 'Membro atualizado com sucesso!',
-        membro: {
-          id: updatedMembro._id,
-          nome: updatedMembro.nome,
-        },
       });
     } catch (error) {
       console.error('Erro ao atualizar membro:', error);
-      return res.status(500).json({ 
-        error: 'Erro ao atualizar membro',
-        details: error.message 
-      });
+      return res.status(500).json({ error: 'Erro ao atualizar membro' });
     }
   }
 
