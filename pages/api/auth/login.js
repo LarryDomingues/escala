@@ -1,5 +1,6 @@
 import connectDB from '../../../lib/mongodb';
 import Usuario from '../../../lib/models/Usuario';
+import Membro from '../../../lib/models/Membro';
 import Log from '../../../lib/models/Log';
 import { createToken, setTokenCookie } from '../../../lib/auth';
 
@@ -17,6 +18,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Email e senha são obrigatórios' });
     }
 
+    // Buscar usuário sem excluir a senha (o select padrão já inclui)
     const usuario = await Usuario.findOne({ email: email.toLowerCase() });
 
     if (!usuario) {
@@ -31,14 +33,20 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Usuário bloqueado. Entre em contato com o administrador' });
     }
 
+    // Usar o método comparePassword do modelo
     const isMatch = await usuario.comparePassword(senha);
     if (!isMatch) {
       return res.status(401).json({ error: 'Email ou senha incorretos' });
     }
 
+    // Atualizar último login
     usuario.ultimo_login = new Date();
     await usuario.save();
 
+    // Buscar membro vinculado
+    const membro = await Membro.findOne({ usuario_id: usuario._id }).select('_id nome');
+
+    // Registrar log
     await Log.create({
       usuario_id: usuario._id,
       acao: 'login',
@@ -57,6 +65,10 @@ export default async function handler(req, res) {
         email: usuario.email,
         nivel: usuario.nivel,
         status: usuario.status,
+        membro: membro ? {
+          id: membro._id,
+          nome: membro.nome,
+        } : null,
       },
     });
   } catch (error) {

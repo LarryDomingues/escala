@@ -2,7 +2,6 @@ import connectDB from '../../../../../lib/mongodb';
 import Usuario from '../../../../../lib/models/Usuario';
 import Log from '../../../../../lib/models/Log';
 import { getUserFromToken } from '../../../../../lib/auth';
-import bcrypt from 'bcryptjs';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -38,9 +37,9 @@ export default async function handler(req, res) {
 
     // Gerar nova senha aleatória (8 caracteres)
     const novaSenha = Math.random().toString(36).slice(-8);
-    const senhaHash = await bcrypt.hash(novaSenha, 10);
-
-    usuario.senha = senhaHash;
+    
+    // Definir a senha como texto puro - o middleware pre('save') fará o hash
+    usuario.senha = novaSenha;
     await usuario.save();
 
     await Log.create({
