@@ -121,6 +121,23 @@ export default function MenuLateral() {
               <span className="text-sm">Criar Escala</span>
             </Link>
           )}
+            
+           // Logo após "Criar Escala" ou onde preferir
+
+{/* Importar Escalas - Apenas Admin */}
+{user?.nivel === 'admin' && (
+  <Link
+    href="/importar-escala"
+    className={`flex items-center px-4 py-3 rounded-xl transition-colors active:scale-95 ${
+      router.pathname === '/importar-escala'
+        ? 'bg-indigo-600 text-white'
+        : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+    }`}
+  >
+    <span className="mr-3 text-xl">📤</span>
+    <span className="text-sm">Importar Escalas</span>
+  </Link>
+)}
 
           {/* Divider para Admin */}
           {user?.nivel === 'admin' && (
