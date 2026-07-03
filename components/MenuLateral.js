@@ -122,7 +122,7 @@ export default function MenuLateral() {
             </Link>
           )}
             
-           // Logo após "Criar Escala" ou onde preferir
+          
 
 {/* Importar Escalas - Apenas Admin */}
 {user?.nivel === 'admin' && (

@@ -30,7 +30,11 @@ export default async function handler(req, res) {
     await connectDB();
 
     // Processar upload do arquivo
-    const form = formidable({ multiples: false });
+    const form = formidable({
+      multiples: false,
+      keepExtensions: true,
+    });
+
     const [fields, files] = await new Promise((resolve, reject) => {
       form.parse(req, (err, fields, files) => {
         if (err) reject(err);
@@ -38,9 +42,15 @@ export default async function handler(req, res) {
       });
     });
 
+    // Verificar se o arquivo foi enviado
     const arquivo = files.arquivo;
     if (!arquivo) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+    }
+
+    // Verificar se o arquivo tem filepath
+    if (!arquivo.filepath) {
+      return res.status(400).json({ error: 'Erro ao processar arquivo: filepath não encontrado' });
     }
 
     // Ler o arquivo CSV
@@ -48,6 +58,11 @@ export default async function handler(req, res) {
     const linhas = fileContent.split('\n').map(l => l.trim());
 
     const resultados = await processarCSV(linhas, user.id);
+
+    // Limpar arquivo temporário
+    try {
+      fs.unlinkSync(arquivo.filepath);
+    } catch (e) {}
 
     return res.status(200).json({
       success: true,
