@@ -4,8 +4,6 @@ import { Membro, Escala, Log } from '../../lib/models';
 import { getUserFromToken } from '../../lib/auth';
 import formidable from 'formidable';
 import fs from 'fs';
-import csv from 'csv-parser';
-import { Readable } from 'stream';
 
 export const config = {
   api: {
@@ -30,7 +28,7 @@ export default async function handler(req, res) {
   try {
     await connectDB();
 
-    // Processar upload do arquivo
+    // Configurar formidable para aceitar o arquivo
     const form = formidable({
       multiples: false,
       keepExtensions: true,
@@ -43,10 +41,18 @@ export default async function handler(req, res) {
       });
     });
 
-    // Verificar se o arquivo foi enviado
-    const arquivo = files.arquivo;
+    // 🔥 CORREÇÃO: Verificar se o arquivo é um array
+    let arquivo = files.arquivo;
     if (!arquivo) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+    }
+
+    // Se for um array, pegar o primeiro elemento
+    if (Array.isArray(arquivo)) {
+      if (arquivo.length === 0) {
+        return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+      }
+      arquivo = arquivo[0];
     }
 
     // Verificar se o arquivo tem caminho
@@ -62,8 +68,6 @@ export default async function handler(req, res) {
 
     // Ler o arquivo CSV
     const fileContent = fs.readFileSync(filePath, 'utf8');
-    
-    // Converter o conteúdo em um array de linhas
     const linhas = fileContent.split('\n').map(l => l.trim());
 
     // Processar as linhas
