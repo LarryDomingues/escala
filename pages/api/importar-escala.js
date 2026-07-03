@@ -48,21 +48,17 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
     }
 
-    // Verificar se o arquivo tem filepath
-    if (!arquivo.filepath) {
-      return res.status(400).json({ error: 'Erro ao processar arquivo: filepath não encontrado' });
+    // 🔥 CORREÇÃO: Verificar se o arquivo tem um caminho válido
+    const filepath = arquivo.filepath || arquivo.path;
+    if (!filepath) {
+      return res.status(400).json({ error: 'Caminho do arquivo inválido' });
     }
 
     // Ler o arquivo CSV
-    const fileContent = fs.readFileSync(arquivo.filepath, 'utf8');
+    const fileContent = fs.readFileSync(filepath, 'utf8');
     const linhas = fileContent.split('\n').map(l => l.trim());
 
     const resultados = await processarCSV(linhas, user.id);
-
-    // Limpar arquivo temporário
-    try {
-      fs.unlinkSync(arquivo.filepath);
-    } catch (e) {}
 
     return res.status(200).json({
       success: true,
