@@ -40,10 +40,8 @@ export default async function handler(req, res) {
         .sort({ nome: 1 })
         .lean();
 
-      // Para usuários comuns, retornar apenas informações básicas
       const result = membros.map(membro => {
-        // Dados básicos para todos
-        const dadosBasicos = {
+        const dados = {
           id: membro._id,
           nome: membro.nome,
           celular: membro.celular || '',
@@ -51,20 +49,18 @@ export default async function handler(req, res) {
           data_nascimento: membro.data_nascimento || '',
           habilidades: membro.habilidade_ids?.map(h => h.nome).join(', ') || '',
           habilidade_ids: membro.habilidade_ids?.map(h => h._id.toString()) || [],
+          usuario_id: membro.usuario_id?._id || null,
         };
 
-        // Adicionar informações de usuário apenas para admin/coordenador
         if (user.nivel === 'admin' || user.nivel === 'coordenador') {
           return {
-            ...dadosBasicos,
-            usuario_id: membro.usuario_id?._id || null,
+            ...dados,
             usuario_sistema: membro.usuario_id?.nome || 'Sem usuário',
             usuario_nivel: membro.usuario_id?.nivel || null,
           };
         }
 
-        // Para membros comuns, retornar apenas dados básicos
-        return dadosBasicos;
+        return dados;
       });
 
       // Armazenar em cache
