@@ -10,12 +10,19 @@ export default function GerenciarUsuarios() {
   const [loading, setLoading] = useState(true);
   const [mensagem, setMensagem] = useState('');
   const [mensagemTipo, setMensagemTipo] = useState('');
+  const [modalAberto, setModalAberto] = useState(false);
+  const [novaSenha, setNovaSenha] = useState('');
+  const [usuarioReset, setUsuarioReset] = useState(null);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const res = await axios.get('/api/auth/me');
         setUser(res.data);
+        if (res.data.nivel !== 'admin') {
+          router.push('/');
+          return;
+        }
         await carregarUsuarios();
       } catch (error) {
         router.push('/login');
@@ -91,6 +98,23 @@ export default function GerenciarUsuarios() {
     }
   };
 
+  // Função para resetar senha
+  const handleResetSenha = async (id, nome) => {
+    if (!confirm(`Tem certeza que deseja resetar a senha do usuário "${nome}"?`)) return;
+    try {
+      const res = await axios.post(`/api/admin/usuarios/${id}/reset-senha`);
+      setNovaSenha(res.data.novaSenha);
+      setUsuarioReset(res.data.usuario);
+      setModalAberto(true);
+      setMensagem(`Senha de ${nome} resetada com sucesso!`);
+      setMensagemTipo('success');
+      await carregarUsuarios();
+    } catch (error) {
+      setMensagem(error.response?.data?.error || 'Erro ao resetar senha');
+      setMensagemTipo('error');
+    }
+  };
+
   const getStatusBadge = (status) => {
     const classes = {
       ativo: 'badge-ativo',
@@ -146,7 +170,7 @@ export default function GerenciarUsuarios() {
                   <th className="px-2 md:px-4 py-2 text-left">Nível</th>
                   <th className="px-2 md:px-4 py-2 text-left">Status</th>
                   <th className="px-2 md:px-4 py-2 text-left hidden md:table-cell">Último Login</th>
-                  <th className="px-2 md:px-4 py-2 text-center min-w-[200px]">Ações</th>
+                  <th className="px-2 md:px-4 py-2 text-center min-w-[250px]">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -170,7 +194,6 @@ export default function GerenciarUsuarios() {
                       </td>
                       <td className="px-2 md:px-4 py-2">
                         <div className="flex flex-wrap items-center justify-center gap-1 md:gap-2">
-                          {/* Ativar - apenas para pendentes e não é o usuário atual */}
                           {usuario.status === 'pendente' && !isCurrentUser && (
                             <button
                               onClick={() => handleAcao(usuario.id, 'ativar', usuario.nome)}
@@ -180,7 +203,6 @@ export default function GerenciarUsuarios() {
                             </button>
                           )}
 
-                          {/* Bloquear - apenas para ativos e não é o usuário atual */}
                           {usuario.status === 'ativo' && !isCurrentUser && (
                             <button
                               onClick={() => handleAcao(usuario.id, 'bloquear', usuario.nome)}
@@ -190,7 +212,6 @@ export default function GerenciarUsuarios() {
                             </button>
                           )}
 
-                          {/* Desbloquear - apenas para bloqueados e não é o usuário atual */}
                           {usuario.status === 'bloqueado' && !isCurrentUser && (
                             <button
                               onClick={() => handleAcao(usuario.id, 'desbloquear', usuario.nome)}
@@ -200,7 +221,6 @@ export default function GerenciarUsuarios() {
                             </button>
                           )}
 
-                          {/* Promover - apenas para membros/coordenadores e não é admin */}
                           {usuario.nivel !== 'admin' && !isCurrentUser && (
                             <button
                               onClick={() => handlePromover(usuario.id, usuario.nivel, usuario.nome)}
@@ -211,7 +231,6 @@ export default function GerenciarUsuarios() {
                             </button>
                           )}
 
-                          {/* Rebaixar - apenas para coordenadores e não é o usuário atual */}
                           {usuario.nivel === 'coordenador' && !isCurrentUser && (
                             <button
                               onClick={() => handleRebaixar(usuario.id, usuario.nome)}
@@ -222,7 +241,6 @@ export default function GerenciarUsuarios() {
                             </button>
                           )}
 
-                          {/* Deletar - apenas para não admin e não é o usuário atual */}
                           {usuario.nivel !== 'admin' && !isCurrentUser && (
                             <button
                               onClick={() => handleDeletar(usuario.id, usuario.nome)}
@@ -233,7 +251,17 @@ export default function GerenciarUsuarios() {
                             </button>
                           )}
 
-                          {/* Mensagem para o próprio usuário */}
+                          {/* Reset Senha - apenas para admin e não para o próprio usuário */}
+                          {!isCurrentUser && (
+                            <button
+                              onClick={() => handleResetSenha(usuario.id, usuario.nome)}
+                              className="bg-purple-600 text-white text-xs px-2 py-1 rounded hover:bg-purple-700 transition"
+                              title="Resetar Senha"
+                            >
+                              🔑
+                            </button>
+                          )}
+
                           {isCurrentUser && (
                             <span className="text-xs text-gray-400">Você não pode se modificar</span>
                           )}
@@ -247,6 +275,54 @@ export default function GerenciarUsuarios() {
           </div>
         </div>
       </div>
+
+      {/* Modal para exibir nova senha */}
+      {modalAberto && usuarioReset && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">🔑 Senha Resetada</h3>
+              <button
+                onClick={() => setModalAberto(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="mb-4">
+              <p className="text-gray-600">
+                A senha do usuário <strong>{usuarioReset.nome}</strong> foi resetada com sucesso!
+              </p>
+              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-gray-600">Nova senha temporária:</p>
+                <p className="text-2xl font-mono font-bold text-purple-700 text-center py-2">
+                  {novaSenha}
+                </p>
+                <p className="text-xs text-gray-400 text-center">
+                  * Recomende que o usuário altere esta senha após o primeiro login.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setModalAberto(false)}
+                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition"
+              >
+                Fechar
+              </button>
+              <button
+                onClick={() => {
+                  navigator.clipboard?.writeText(novaSenha);
+                  alert('Senha copiada para a área de transferência!');
+                }}
+                className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition"
+              >
+                📋 Copiar Senha
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
