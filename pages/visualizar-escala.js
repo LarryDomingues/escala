@@ -13,6 +13,7 @@ export default function VisualizarEscala() {
   const [loading, setLoading] = useState(true);
   const [mesSelecionado, setMesSelecionado] = useState(format(new Date(), 'yyyy-MM'));
   const [stats, setStats] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -20,9 +21,8 @@ export default function VisualizarEscala() {
         const res = await axios.get('/api/auth/me');
         setUser(res.data);
         
-        // Buscar o membro vinculado ao usuário
-        if (res.data) {
-          await buscarMembroLogado(res.data.id);
+        if (res.data && res.data.membro) {
+          setMembroLogado(res.data.membro);
         }
         
         await loadEscalas();
@@ -35,19 +35,9 @@ export default function VisualizarEscala() {
     checkAuth();
   }, [mesSelecionado]);
 
-  const buscarMembroLogado = async (usuarioId) => {
-    try {
-      const res = await axios.get('/api/membros');
-      const membros = res.data;
-      const membro = membros.find(m => m.usuario_id === usuarioId);
-      setMembroLogado(membro || null);
-    } catch (error) {
-      console.error('Erro ao buscar membro logado:', error);
-    }
-  };
-
   const loadEscalas = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await axios.get(`/api/escala?mes=${mesSelecionado}`);
       const data = res.data;
@@ -74,31 +64,21 @@ export default function VisualizarEscala() {
       });
     } catch (error) {
       console.error('Erro ao carregar escalas:', error);
+      setError('Erro ao carregar escalas. Tente novamente.');
     } finally {
       setLoading(false);
     }
   };
 
-  const formatarData = (data) => {
-    return format(parseISO(data), 'dd/MM/yyyy');
-  };
-
+  const formatarData = (data) => format(parseISO(data), 'dd/MM/yyyy');
   const getYouTubeLink = (link) => {
     if (!link) return null;
     const match = link.match(/(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
-    if (match) {
-      return `https://www.youtube.com/watch?v=${match[1]}`;
-    }
-    return link;
+    return match ? `https://www.youtube.com/watch?v=${match[1]}` : link;
   };
 
-  // Função para verificar se o membro é o usuário logado
-  const isUsuarioLogado = (membroId) => {
-    if (!membroLogado) return false;
-    return membroLogado.id === membroId;
-  };
+  const isUsuarioLogado = (membroId) => membroLogado?.id === membroId;
 
-  // Função para formatar o nome com destaque
   const formatarNomeMembro = (nome, membroId) => {
     if (isUsuarioLogado(membroId)) {
       return (
@@ -110,11 +90,28 @@ export default function VisualizarEscala() {
     return <span className="membro-nome">{nome}</span>;
   };
 
-  const handleImprimir = () => {
-    window.print();
-  };
+  const handleImprimir = () => window.print();
 
-  const nomeMes = format(new Date(mesSelecionado + '-01'), 'MMMM', { locale: ptBR });
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex justify-center items-center h-64">
+          <div className="text-gray-500">Carregando...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <Layout>
+        <div className="p-4 bg-red-50 text-red-600 rounded-lg">
+          <p>{error}</p>
+          <button onClick={loadEscalas} className="mt-2 btn-primary">Tentar novamente</button>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -129,12 +126,8 @@ export default function VisualizarEscala() {
               <div>
                 <p className="font-medium text-orange-800 text-sm md:text-base">
                   Você está destacado na escala como <strong>{membroLogado.nome}</strong>
-                  {user?.nivel === 'admin' && (
-                    <span className="ml-2 text-xs text-gray-500">(Administrador)</span>
-                  )}
-                  {user?.nivel === 'coordenador' && (
-                    <span className="ml-2 text-xs text-gray-500">(Coordenador)</span>
-                  )}
+                  {user?.nivel === 'admin' && <span className="ml-2 text-xs text-gray-500">(Administrador)</span>}
+                  {user?.nivel === 'coordenador' && <span className="ml-2 text-xs text-gray-500">(Coordenador)</span>}
                 </p>
               </div>
             </div>
@@ -152,7 +145,7 @@ export default function VisualizarEscala() {
           </div>
         )}
 
-        {/* Legenda de Destaque */}
+        {/* Legenda */}
         <div className="bg-yellow-50 p-3 md:p-4 rounded-lg mb-4 md:mb-6 border border-yellow-200 flex items-center gap-3 flex-wrap">
           <span className="font-medium text-yellow-800">📌 Legenda:</span>
           <span className="inline-block bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold animate-pulse">
@@ -198,11 +191,7 @@ export default function VisualizarEscala() {
           </div>
         )}
 
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="text-gray-500">Carregando...</div>
-          </div>
-        ) : escalas.length === 0 ? (
+        {escalas.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-12 text-center">
             <div className="text-5xl mb-4">📅</div>
             <h3 className="text-xl font-semibold text-gray-700 mb-2">Nenhuma escala encontrada</h3>
@@ -324,16 +313,6 @@ export default function VisualizarEscala() {
         }
         .bg-yellow-50 {
           background-color: #fffbeb !important;
-        }
-        @media print {
-          .bg-yellow-50 {
-            background-color: #fef3c7 !important;
-          }
-          .membro-destaque {
-            background: #ed8936 !important;
-            animation: none !important;
-            border: 2px solid #dd6b20 !important;
-          }
         }
       `}</style>
     </Layout>

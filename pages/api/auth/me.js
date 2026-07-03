@@ -1,6 +1,5 @@
 import connectDB from '../../../lib/mongodb';
-import Usuario from '../../../lib/models/Usuario';
-import Membro from '../../../lib/models/Membro';
+import { Usuario, Membro } from '../../../lib/models';
 import { getUserFromToken } from '../../../lib/auth';
 
 // Cache para dados do usuário
@@ -27,16 +26,16 @@ export default async function handler(req, res) {
 
     await connectDB();
     
-    // Buscar apenas campos necessários
+    // Buscar usuário
     const usuario = await Usuario.findById(user.id)
       .select('nome email nivel status ultimo_login data_cadastro')
-      .lean(); // .lean() para performance
+      .lean();
 
     if (!usuario) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
 
-    // Buscar membro vinculado
+    // Buscar membro vinculado a este usuário
     const membro = await Membro.findOne({ usuario_id: user.id })
       .select('_id nome')
       .lean();

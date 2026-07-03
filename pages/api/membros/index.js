@@ -13,28 +13,24 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Não autenticado' });
   }
 
-  if (user.nivel !== 'admin' && user.nivel !== 'coordenador') {
-    return res.status(403).json({ error: 'Sem permissão' });
-  }
-
-  // GET - Listar membros
+  // GET - Listar membros (disponível para todos os usuários autenticados)
   if (req.method === 'GET') {
     try {
+      await connectDB();
+
       // Verificar cache
-      const cacheKey = `membros_${user.nivel}`;
+      const cacheKey = `membros_${user.nivel}_${user.id}`;
       const cachedData = membrosCache.get(cacheKey);
       if (cachedData && Date.now() - cachedData.timestamp < MEMBROS_CACHE_TTL) {
         return res.status(200).json(cachedData.data);
       }
 
-      await connectDB();
-
-      // Buscar membros com populate correto
+      // Buscar membros - todos os usuários podem ver a lista
       const membros = await Membro.find()
         .populate({
           path: 'usuario_id',
           model: 'Usuario',
-          select: 'nome email'
+          select: 'nome email nivel'
         })
         .populate({
           path: 'habilidade_ids',
@@ -44,17 +40,32 @@ export default async function handler(req, res) {
         .sort({ nome: 1 })
         .lean();
 
-      const result = membros.map(membro => ({
-        id: membro._id,
-        nome: membro.nome,
-        celular: membro.celular || '',
-        email: membro.email || '',
-        data_nascimento: membro.data_nascimento || '',
-        usuario_id: membro.usuario_id?._id || null,
-        usuario_sistema: membro.usuario_id?.nome || 'Sem usuário',
-        habilidades: membro.habilidade_ids?.map(h => h.nome).join(', ') || '',
-        habilidade_ids: membro.habilidade_ids?.map(h => h._id.toString()) || [],
-      }));
+      // Para usuários comuns, retornar apenas informações básicas
+      const result = membros.map(membro => {
+        // Dados básicos para todos
+        const dadosBasicos = {
+          id: membro._id,
+          nome: membro.nome,
+          celular: membro.celular || '',
+          email: membro.email || '',
+          data_nascimento: membro.data_nascimento || '',
+          habilidades: membro.habilidade_ids?.map(h => h.nome).join(', ') || '',
+          habilidade_ids: membro.habilidade_ids?.map(h => h._id.toString()) || [],
+        };
+
+        // Adicionar informações de usuário apenas para admin/coordenador
+        if (user.nivel === 'admin' || user.nivel === 'coordenador') {
+          return {
+            ...dadosBasicos,
+            usuario_id: membro.usuario_id?._id || null,
+            usuario_sistema: membro.usuario_id?.nome || 'Sem usuário',
+            usuario_nivel: membro.usuario_id?.nivel || null,
+          };
+        }
+
+        // Para membros comuns, retornar apenas dados básicos
+        return dadosBasicos;
+      });
 
       // Armazenar em cache
       membrosCache.set(cacheKey, {
@@ -72,8 +83,12 @@ export default async function handler(req, res) {
     }
   }
 
-  // POST - Criar membro
+  // POST - Criar membro (apenas admin/coordenador)
   if (req.method === 'POST') {
+    if (user.nivel !== 'admin' && user.nivel !== 'coordenador') {
+      return res.status(403).json({ error: 'Sem permissão' });
+    }
+
     try {
       const { nome, celular, email, data_nascimento, habilidades } = req.body;
 
