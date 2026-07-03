@@ -1,3 +1,4 @@
+// pages/api/importar-escala.js
 import connectDB from '../../lib/mongodb';
 import { Membro, Escala, Log } from '../../lib/models';
 import { getUserFromToken } from '../../lib/auth';
@@ -48,17 +49,32 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
     }
 
-    // 🔥 CORREÇÃO: Verificar se o arquivo tem um caminho válido
-    const filepath = arquivo.filepath || arquivo.path;
-    if (!filepath) {
-      return res.status(400).json({ error: 'Caminho do arquivo inválido' });
+    // Verificar se o arquivo tem caminho
+    const filePath = arquivo.filepath || arquivo.path;
+    if (!filePath) {
+      return res.status(400).json({ error: 'Caminho do arquivo não encontrado' });
+    }
+
+    // Verificar se o arquivo existe
+    if (!fs.existsSync(filePath)) {
+      return res.status(400).json({ error: 'Arquivo temporário não encontrado' });
     }
 
     // Ler o arquivo CSV
-    const fileContent = fs.readFileSync(filepath, 'utf8');
+    const fileContent = fs.readFileSync(filePath, 'utf8');
+    
+    // Converter o conteúdo em um array de linhas
     const linhas = fileContent.split('\n').map(l => l.trim());
 
+    // Processar as linhas
     const resultados = await processarCSV(linhas, user.id);
+
+    // Limpar arquivo temporário
+    try {
+      fs.unlinkSync(filePath);
+    } catch (e) {
+      console.warn('Não foi possível remover arquivo temporário:', e.message);
+    }
 
     return res.status(200).json({
       success: true,
@@ -67,7 +83,9 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Erro na importação:', error);
-    return res.status(500).json({ error: 'Erro ao importar arquivo: ' + error.message });
+    return res.status(500).json({ 
+      error: 'Erro ao importar arquivo: ' + error.message 
+    });
   }
 }
 
@@ -79,7 +97,7 @@ async function processarCSV(linhas, usuarioId) {
   let membrosCriados = 0;
   let erros = 0;
 
-  // Mapeamento de nomes de membros que podem ter variações
+  // Mapeamento de nomes de membros
   const mapaNomes = {
     'Pr': 'Pr. Rodrigo',
     'Pr Rodrigo': 'Pr. Rodrigo',
@@ -116,15 +134,12 @@ async function processarCSV(linhas, usuarioId) {
     const nomeNormalizado = normalizarNome(nome);
     if (!nomeNormalizado) return null;
 
-    // Verificar cache
     if (membrosCache.has(nomeNormalizado)) {
       return membrosCache.get(nomeNormalizado);
     }
 
-    // Buscar no banco
     let membro = await Membro.findOne({ nome: nomeNormalizado });
     if (!membro) {
-      // Criar membro automaticamente
       membro = await Membro.create({
         nome: nomeNormalizado,
         criado_por: usuarioId,
@@ -136,7 +151,6 @@ async function processarCSV(linhas, usuarioId) {
     return membro._id;
   }
 
-  // Percorrer as linhas do CSV
   let mesAtual = null;
   let anoAtual = null;
   let cabecalho = null;
@@ -147,7 +161,6 @@ async function processarCSV(linhas, usuarioId) {
 
     const colunas = linha.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
 
-    // Verificar se é um cabeçalho de mês
     if (colunas.length > 0 && colunas[0].includes('Escala do Louvor')) {
       const texto = colunas[0];
       const match = texto.match(/Escala do Louvor (\w+) (\d{4})/);
@@ -160,23 +173,17 @@ async function processarCSV(linhas, usuarioId) {
       }
     }
 
-    // Verificar se é um cabeçalho de colunas
     if (colunas.includes('Dia') && colunas.includes('Dia da Semana') && colunas.includes('Voz')) {
       cabecalho = colunas;
       continue;
     }
 
-    // Se não temos cabeçalho ou mês, pular
     if (!cabecalho || !mesAtual || !anoAtual) continue;
 
-    // Pular linhas vazias ou com "ZELADORIA", "REUNIÃO"
     const diaStr = colunas[0] || '';
     if (!diaStr || diaStr.includes('ZELADORIA') || diaStr.includes('REUNIÃO')) continue;
-
-    // Pular linhas que são cabeçalhos duplicados
     if (diaStr === 'Dia' || diaStr === 'Dia da Semana') continue;
 
-    // Extrair dados da linha
     const dia = diaStr.trim();
     const diaSemana = colunas[1] || '';
     const voz = colunas[2] || '';
@@ -187,7 +194,6 @@ async function processarCSV(linhas, usuarioId) {
     const bateria = colunas[7] || '';
     const teclado = colunas[8] || '';
 
-    // Converter data: "4-fev." -> "2024-02-04"
     const dataConvertida = converterData(dia, mesAtual, anoAtual);
     if (!dataConvertida) {
       erros++;
@@ -195,7 +201,6 @@ async function processarCSV(linhas, usuarioId) {
       continue;
     }
 
-    // Buscar IDs dos membros
     const vozId = voz ? await getMembroId(voz) : null;
     const backVocalId = backVocal ? await getMembroId(backVocal) : null;
     const violaoId = violao ? await getMembroId(violao) : null;
@@ -204,7 +209,6 @@ async function processarCSV(linhas, usuarioId) {
     const bateriaId = bateria ? await getMembroId(bateria) : null;
     const tecladoId = teclado ? await getMembroId(teclado) : null;
 
-    // Preparar dados da escala
     const escalaData = {
       data: dataConvertida,
       dia_semana: diaSemana || '',
@@ -219,7 +223,6 @@ async function processarCSV(linhas, usuarioId) {
       atualizado_em: new Date(),
     };
 
-    // Verificar se já existe escala para esta data
     const existe = await Escala.findOne({ data: dataConvertida });
 
     if (existe) {
@@ -234,7 +237,6 @@ async function processarCSV(linhas, usuarioId) {
     }
   }
 
-  // Registrar log
   await Log.create({
     usuario_id: usuarioId,
     acao: 'importar_escala',
@@ -252,12 +254,10 @@ async function processarCSV(linhas, usuarioId) {
 }
 
 function converterData(diaStr, mes, ano) {
-  // Extrair número do dia: "4-fev." -> "4"
   const match = diaStr.match(/^(\d+)/);
   if (!match) return null;
   const diaNum = parseInt(match[1]);
 
-  // Mapear meses
   const meses = {
     'jan': 1, 'jan.': 1,
     'fev': 2, 'fev.': 2,
@@ -274,15 +274,9 @@ function converterData(diaStr, mes, ano) {
   };
 
   const mesNum = meses[mes.toLowerCase()];
-  if (!mesNum) {
-    console.error(`Mês não reconhecido: ${mes}`);
-    return null;
-  }
+  if (!mesNum) return null;
 
-  // Garantir que o ano é 2024 (ou o ano do cabeçalho)
   const anoFinal = ano || 2024;
-
-  // Formatar YYYY-MM-DD
   const dataStr = `${anoFinal}-${String(mesNum).padStart(2, '0')}-${String(diaNum).padStart(2, '0')}`;
   return dataStr;
 }

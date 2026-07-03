@@ -1,3 +1,4 @@
+// pages/importar-escala.js
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
@@ -14,7 +15,7 @@ export default function ImportarEscala() {
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
-    if (selectedFile && selectedFile.type === 'text/csv') {
+    if (selectedFile) {
       setFile(selectedFile);
       setMensagem('');
       setMensagemTipo('');
