@@ -99,21 +99,21 @@ export default function GerenciarUsuarios() {
   };
 
   // Função para resetar senha
-  const handleResetSenha = async (id, nome) => {
-    if (!confirm(`Tem certeza que deseja resetar a senha do usuário "${nome}"?`)) return;
-    try {
-      const res = await axios.post(`/api/admin/usuarios/${id}/reset-senha`);
-      setNovaSenha(res.data.novaSenha);
-      setUsuarioReset(res.data.usuario);
-      setModalAberto(true);
-      setMensagem(`Senha de ${nome} resetada com sucesso!`);
-      setMensagemTipo('success');
-      await carregarUsuarios();
-    } catch (error) {
-      setMensagem(error.response?.data?.error || 'Erro ao resetar senha');
-      setMensagemTipo('error');
-    }
-  };
+ const handleResetSenha = async (id, nome) => {
+  if (!confirm(`Tem certeza que deseja resetar a senha do usuário "${nome}"?`)) return;
+  try {
+    const res = await axios.post(`/api/admin/usuarios/${id}/reset-senha`);
+    setNovaSenha(res.data.novaSenha);
+    setUsuarioReset(res.data.usuario);
+    setModalAberto(true);
+    setMensagem(`Senha de ${nome} resetada com sucesso!`);
+    setMensagemTipo('success');
+    await carregarUsuarios();
+  } catch (error) {
+    setMensagem(error.response?.data?.error || 'Erro ao resetar senha');
+    setMensagemTipo('error');
+  }
+  }; 
 
   const getStatusBadge = (status) => {
     const classes = {
