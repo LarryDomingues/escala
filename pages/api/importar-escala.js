@@ -124,10 +124,10 @@ async function processarCSV(linhas, usuarioId) {
     'David': 'David Gonçalves',
     'Daivid': 'David Gonçalves',
     'Felipe': 'Felipe Saraiva',
-    'Elo':'Eloisa Rogati'
+    'Elo':'Eloisa Rogati',
     'Isa': 'Isadora Pompiani',
-    'Isadora':'Isadora Pompiani'
-    'Cleber ': 'Cleber Saraiva',
+    'Isadora':'Isadora Pompiani',
+    'Cleber': 'Cleber Saraiva',
   };
 
   function normalizarNome(nome) {
