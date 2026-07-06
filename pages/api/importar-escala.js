@@ -70,8 +70,9 @@ export default async function handler(req, res) {
     const fileContent = fs.readFileSync(filePath, 'utf8');
     const linhas = fileContent.split('\n').map(l => l.trim());
 
-    // Processar as linhas
+    console.log(`[importar-escala] Arquivo lido: ${linhas.length} linhas, mês extraído do CSV`);
     const resultados = await processarCSV(linhas, user.id);
+    console.log(`[importar-escala] Resultado final:`, JSON.stringify(resultados));
 
     // Limpar arquivo temporário
     try {
@@ -163,7 +164,8 @@ async function processarCSV(linhas, usuarioId) {
     const linha = linhas[i];
     if (!linha) continue;
 
-    const colunas = linha.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+    const delim = linha.includes(';') ? ';' : ',';
+    const colunas = linha.split(delim).map(c => c.trim().replace(/^"|"$/g, ''));
 
     if (colunas.length > 0 && colunas[0].includes('Escala do Louvor')) {
       const texto = colunas[0];
@@ -172,17 +174,24 @@ async function processarCSV(linhas, usuarioId) {
         mesAtual = match[1];
         anoAtual = parseInt(match[2]);
         cabecalho = null;
+        console.log(`[importar-escala] Cabeçalho detectado: mês="${mesAtual}", ano=${anoAtual}`);
         detalhes.push(`📅 Processando ${mesAtual} ${anoAtual}`);
         continue;
+      } else {
+        console.log(`[importar-escala] Linha 'Escala do Louvor' não correspondeu ao regex: "${texto}"`);
       }
     }
 
     if (colunas.includes('Dia') && colunas.includes('Dia da Semana') && colunas.includes('Voz')) {
       cabecalho = colunas;
+      console.log(`[importar-escala] Cabeçalho de colunas detectado: ${cabecalho.join(', ')}`);
       continue;
     }
 
-    if (!cabecalho || !mesAtual || !anoAtual) continue;
+    if (!cabecalho || !mesAtual || !anoAtual) {
+      console.log(`[importar-escala] Linha ignorada (sem cabeçalho/mês/ano): linha ${i + 1} — "${linha.slice(0, 60)}"`);
+      continue;
+    }
 
     const diaStr = colunas[0] || '';
     if (!diaStr || diaStr.includes('ZELADORIA') || diaStr.includes('REUNIÃO')) continue;
@@ -201,7 +210,8 @@ async function processarCSV(linhas, usuarioId) {
     const dataConvertida = converterData(dia, mesAtual, anoAtual);
     if (!dataConvertida) {
       erros++;
-      detalhes.push(`⚠️ Erro ao converter data: ${dia} (${mesAtual})`);
+      console.log(`[importar-escala] ERRO ao converter data: dia="${dia}", mes="${mesAtual}", ano=${anoAtual}`);
+      detalhes.push(`⚠️ Erro ao converter data: ${dia} (${mesAtual}). Mês "${mesAtual}" não encontrado no mapa de meses.`);
       continue;
     }
 
@@ -232,11 +242,13 @@ async function processarCSV(linhas, usuarioId) {
     if (existe) {
       await Escala.updateOne({ data: dataConvertida }, { $set: escalaData });
       escalasAtualizadas++;
+      console.log(`[importar-escala] Atualizada: ${dataConvertida}`);
       detalhes.push(`🔄 Escala atualizada: ${dataConvertida} (${diaSemana})`);
     } else {
       escalaData.criado_por = usuarioId;
       await Escala.create(escalaData);
       escalasImportadas++;
+      console.log(`[importar-escala] Criada: ${dataConvertida}`);
       detalhes.push(`✅ Escala importada: ${dataConvertida} (${diaSemana})`);
     }
   }
@@ -263,22 +275,26 @@ function converterData(diaStr, mes, ano) {
   const diaNum = parseInt(match[1]);
 
   const meses = {
-    'jan': 1, 'jan.': 1,
-    'fev': 2, 'fev.': 2,
-    'mar': 3, 'mar.': 3,
-    'abr': 4, 'abr.': 4,
-    'mai': 5, 'mai.': 5,
-    'jun': 6, 'jun.': 6,
-    'jul': 7, 'jul.': 7,
-    'ago': 8, 'ago.': 8,
-    'set': 9, 'set.': 9,
-    'out': 10, 'out.': 10,
-    'nov': 11, 'nov.': 11,
-    'dez': 12, 'dez.': 12,
+    'jan': 1, 'jan.': 1, 'janeiro': 1,
+    'fev': 2, 'fev.': 2, 'fevereiro': 2,
+    'mar': 3, 'mar.': 3, 'março': 3, 'marco': 3,
+    'abr': 4, 'abr.': 4, 'abril': 4,
+    'mai': 5, 'mai.': 5, 'maio': 5,
+    'jun': 6, 'jun.': 6, 'junho': 6,
+    'jul': 7, 'jul.': 7, 'julho': 7,
+    'ago': 8, 'ago.': 8, 'agosto': 8,
+    'set': 9, 'set.': 9, 'setembro': 9,
+    'out': 10, 'out.': 10, 'outubro': 10,
+    'nov': 11, 'nov.': 11, 'novembro': 11,
+    'dez': 12, 'dez.': 12, 'dezembro': 12,
   };
 
-  const mesNum = meses[mes.toLowerCase()];
-  if (!mesNum) return null;
+  const mesLower = mes.toLowerCase();
+  const mesNum = meses[mesLower];
+  if (!mesNum) {
+    console.log(`[importar-escala/converterData] Mês não reconhecido: "${mes}" (lower: "${mesLower}")`);
+    return null;
+  }
 
   const anoFinal = ano || 2024;
   const dataStr = `${anoFinal}-${String(mesNum).padStart(2, '0')}-${String(diaNum).padStart(2, '0')}`;
