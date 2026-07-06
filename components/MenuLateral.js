@@ -73,13 +73,12 @@ export default function MenuLateral() {
         flex flex-col
       `}>
         {user && (
-          <div className="p-6 border-b border-gray-800">
+          <div className="p-3 border-b bg-white/50 border-gray-800">
             <div className="flex flex-col items-center">
-              <div className=" rounded-xl bg-white/50 p-0.5 backdrop-blur-sm mb-3 ring-1 ring-white/10 overflow-hidden">
-                <Image src="/logo.png" alt="Logo" width={100} height={100} className="rounded-lg" />
+              <div className=" rounded-xl  p-0.5  overflow-hidden">
+                <Image src="/logo.png" alt="Logo" width={200} height={200} className="rounded-lg" />
               </div>
-              <div className="font-semibold text-base text-gray-100">Louvor</div>
-              <div className="text-xs text-gray-500 mt-0.5">Sistema de Escala</div>
+             
             </div>
           </div>
         )}
