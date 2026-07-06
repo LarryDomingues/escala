@@ -107,6 +107,7 @@ async function processarCSV(linhas, usuarioId) {
     'Pr': 'Pr. Rodrigo',
     'Pr Rodrigo': 'Pr. Rodrigo',
     'Pr. Rodrigo': 'Pr. Rodrigo',
+    'Pr.':'Pr. Rodrigo',
     'Larry': 'Larry Carvalho',
     'Larry Carvalho': 'Larry Carvalho',
     'Willian': 'Willian Rogati',
