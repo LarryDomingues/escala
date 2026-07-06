@@ -117,16 +117,12 @@ async function processarCSV(linhas, usuarioId) {
     'Ronaldo Ocon': 'Ronaldo Ocon',
     'Ronaldo Ocon': 'Ronaldo Ocon',
     'Thiago': 'Thiago Gonçalves',
-    'Thiago Gonçalves': 'Thiago Gonçalves',
-    'Thiago': 'Tiago Gonçalves',
-    'Cleber': 'Cleber Saraiva',
-    'Cleber Saraiva': 'Cleber Saraiva',
-    'Cleber Saraiva': 'Cleber Saraiva',
+    'Tiago': 'Tiago saraiva',
     'David': 'David Gonçalves',
     'Daivid': 'David Gonçalves',
     'Felipe': 'Felipe Saraiva',
     'Elo':'Eloisa Rogati',
-    'Isa': 'Isadora Pompiani',
+    'Isa':'Isadora Pompiani',
     'Cleber': 'Cleber Saraiva',
   };
 
