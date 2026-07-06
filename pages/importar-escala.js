@@ -51,9 +51,19 @@ export default function ImportarEscala() {
         },
       });
 
-      setMensagem('Importação concluída com sucesso!');
-      setMensagemTipo('success');
-      setResultado(res.data);
+      const data = res.data;
+      const total = (data.escalasImportadas || 0) + (data.escalasAtualizadas || 0);
+      if (total === 0 && (data.erros || 0) > 0) {
+        setMensagem(`Importação concluída, mas ${data.erros} linha(s) tiveram erro. Nenhuma escala foi salva. Verifique o formato do CSV.`);
+        setMensagemTipo('error');
+      } else if (total === 0) {
+        setMensagem('Nenhuma escala foi importada. Verifique se o CSV está no formato correto.');
+        setMensagemTipo('error');
+      } else {
+        setMensagem('Importação concluída com sucesso!');
+        setMensagemTipo('success');
+      }
+      setResultado(data);
     } catch (error) {
       console.error('Erro na importação:', error);
       setMensagem(error.response?.data?.error || 'Erro ao importar arquivo.');
