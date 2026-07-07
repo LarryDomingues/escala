@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import axios from 'axios';
+import { useUser } from '../contexts/UserContext';
 import {
   LayoutDashboard, Calendar, Music, User, PenSquare,
   Upload, Users, Link2, ScrollText, LogOut, Menu, X
@@ -10,18 +11,8 @@ import {
 
 export default function MenuLateral() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
+  const { user } = useUser();
   const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const res = await axios.get('/api/auth/me');
-        setUser(res.data);
-      } catch (error) {}
-    };
-    loadUser();
-  }, []);
 
   const handleLogout = async () => {
     await axios.post('/api/auth/logout');

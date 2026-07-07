@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Head from 'next/head';
+import UserContext from '../contexts/UserContext';
 
 // Cache do usuário
 let userCache = null;
@@ -123,7 +124,7 @@ function MyApp({ Component, pageProps }) {
   const enhancedProps = { ...pageProps, user, isAuthenticated };
 
   return (
-    <>
+    <UserContext.Provider value={{ user, isAuthenticated }}>
       <Head>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover" />
@@ -133,7 +134,7 @@ function MyApp({ Component, pageProps }) {
         <link rel="icon" href="/favicon.ico" />
       </Head>
       <Component {...enhancedProps} />
-    </>
+    </UserContext.Provider>
   );
 }
 

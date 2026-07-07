@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import axios from 'axios';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useUser } from '../contexts/UserContext';
 
 // Cache para dados do dashboard
 let dashboardCache = null;
@@ -12,7 +13,7 @@ const DASHBOARD_CACHE_TTL = 60000; // 1 minuto
 
 export default function Dashboard() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
+  const { user, isAuthenticated } = useUser();
   const [membroLogado, setMembroLogado] = useState(null);
   const [escalas, setEscalas] = useState([]);
   const [proximos, setProximos] = useState([]);
@@ -20,8 +21,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const loadData = useCallback(async (forceRefresh = false) => {
-    // Verificar cache
+  const loadData = async (forceRefresh = false) => {
     const now = Date.now();
     if (!forceRefresh && dashboardCache && (now - dashboardCacheTime) < DASHBOARD_CACHE_TTL) {
       const cached = dashboardCache;
@@ -38,25 +38,25 @@ export default function Dashboard() {
 
     try {
       const mesAtual = format(new Date(), 'yyyy-MM');
-      
-      // Buscar escalas do mês
+
       const escalasRes = await axios.get(`/api/escala?mes=${mesAtual}`);
       const escalasData = escalasRes.data;
-      
-      // Buscar membros (agora todos podem acessar)
+
       const membrosRes = await axios.get('/api/membros');
       const membrosData = membrosRes.data;
-      
-      // Encontrar membro vinculado ao usuário logado
+
       let membro = null;
       if (user && user.id) {
         membro = membrosData.find(m => m.usuario_id === user.id) || null;
       }
-      
+
+      if (user && user.membro) {
+        membro = user.membro;
+      }
+
       const hoje = format(new Date(), 'yyyy-MM-dd');
       const proximosData = escalasData.filter(e => e.data >= hoje).slice(0, 7);
 
-      // Atualizar cache
       dashboardCache = {
         escalas: escalasData,
         proximos: proximosData,
@@ -75,26 +75,15 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  };
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await axios.get('/api/auth/me');
-        setUser(res.data);
-        
-        // Se o membro já veio na resposta do /api/auth/me, usar ele
-        if (res.data && res.data.membro) {
-          setMembroLogado(res.data.membro);
-        }
-        
-        await loadData();
-      } catch (error) {
-        router.push('/login');
-      }
-    };
-    checkAuth();
-  }, [loadData]);
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+    loadData();
+  }, []);
 
   const formatarData = (data) => format(parseISO(data), 'dd/MM/yyyy');
   const getYouTubeLink = (link) => {
