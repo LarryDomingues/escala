@@ -35,7 +35,7 @@ export default function MenuLateral() {
     return (
       <Link
         href={href}
-        className={`flex items-center px-4 py-2.5 mb-0.5 rounded-lg transition-all duration-200 ${
+        className={`flex items-center px-4 py-2.5 mb-0.5 rounded-lg transition-colors duration-200 ${
           active
             ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
             : 'text-gray-400 hover:bg-gray-700/60 hover:text-gray-200'
@@ -117,7 +117,7 @@ export default function MenuLateral() {
         <div className="p-3 border-t border-gray-800 safe-bottom">
           <button
             onClick={handleLogout}
-            className="flex items-center w-full px-4 py-2.5 text-gray-500 hover:text-gray-200 hover:bg-gray-800 rounded-lg transition-all duration-200"
+            className="flex items-center w-full px-4 py-2.5 text-gray-500 hover:text-gray-200 hover:bg-gray-800 rounded-lg transition-colors duration-200"
           >
             <LogOut className="w-5 h-5 mr-3 flex-shrink-0" strokeWidth={1.5} />
             <span className="text-sm font-medium">Sair</span>
