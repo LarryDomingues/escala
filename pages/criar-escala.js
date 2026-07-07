@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import axios from 'axios';
-import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function CriarEscala() {
@@ -16,6 +16,8 @@ export default function CriarEscala() {
   const [diasEscala, setDiasEscala] = useState([]);
   const [mensagem, setMensagem] = useState('');
   const [mensagemTipo, setMensagemTipo] = useState('');
+  const [dataAvulsa, setDataAvulsa] = useState('');
+  const [diasAvulsos, setDiasAvulsos] = useState([]);
 
   const HABILIDADES = ['Voz', 'Voz2', 'Violão', 'Guitarra', 'Baixo', 'Bateria', 'Teclado'];
   const CAMPOS_HABILIDADES = {
@@ -40,6 +42,7 @@ export default function CriarEscala() {
       .map(day => ({
         data: format(day, 'yyyy-MM-dd'),
         dia_semana: format(day, 'EEEE', { locale: ptBR }),
+        isAvulsa: false,
       }));
   };
 
@@ -69,7 +72,26 @@ export default function CriarEscala() {
       setEscalas(escalasRes.data.escalas || []);
 
       const [ano, mes] = mesSelecionado.split('-').map(Number);
-      setDiasEscala(gerarDiasEscala(ano, mes));
+      const diasRegulares = gerarDiasEscala(ano, mes);
+      
+      // Carregar dias avulsos salvos
+      const diasAvulsosSalvos = await carregarDiasAvulsos(ano, mes);
+      
+      // Combinar dias regulares e avulsos
+      const todosDias = [...diasRegulares];
+      
+      // Adicionar dias avulsos que não estão na lista regular
+      diasAvulsosSalvos.forEach(diaAvulso => {
+        if (!todosDias.some(d => d.data === diaAvulso.data)) {
+          todosDias.push(diaAvulso);
+        }
+      });
+      
+      // Ordenar por data
+      todosDias.sort((a, b) => a.data.localeCompare(b.data));
+      
+      setDiasEscala(todosDias);
+      setDiasAvulsos(diasAvulsosSalvos);
 
       const membrosPorHab = {};
       HABILIDADES.forEach(hab => {
@@ -85,6 +107,19 @@ export default function CriarEscala() {
       setMensagemTipo('error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const carregarDiasAvulsos = async (ano, mes) => {
+    try {
+      const res = await axios.get(`/api/escala/avulsos?ano=${ano}&mes=${mes}`);
+      return res.data.map(d => ({
+        ...d,
+        isAvulsa: true,
+      }));
+    } catch (error) {
+      console.error('Erro ao carregar dias avulsos:', error);
+      return [];
     }
   };
 
@@ -137,12 +172,90 @@ export default function CriarEscala() {
     }
   };
 
+  const handleAdicionarDataAvulsa = async () => {
+    if (!dataAvulsa) {
+      setMensagem('Selecione uma data');
+      setMensagemTipo('error');
+      return;
+    }
+
+    // Verificar se a data já existe na lista
+    if (diasEscala.some(d => d.data === dataAvulsa)) {
+      setMensagem('Esta data já está na escala');
+      setMensagemTipo('error');
+      return;
+    }
+
+    try {
+      // Verificar se a data está no mês selecionado
+      const [anoSelecionado, mesSelecionadoNum] = mesSelecionado.split('-').map(Number);
+      const [anoAvulso, mesAvulso] = dataAvulsa.split('-').map(Number);
+      
+      if (anoAvulso !== anoSelecionado || mesAvulso !== mesSelecionadoNum) {
+        setMensagem('A data deve ser do mês selecionado');
+        setMensagemTipo('error');
+        return;
+      }
+
+      const diaSemana = format(parseISO(dataAvulsa), 'EEEE', { locale: ptBR });
+      
+      // Adicionar à lista
+      const novoDia = {
+        data: dataAvulsa,
+        dia_semana: diaSemana,
+        isAvulsa: true,
+      };
+      
+      setDiasEscala([...diasEscala, novoDia].sort((a, b) => a.data.localeCompare(b.data)));
+      setDiasAvulsos([...diasAvulsos, novoDia]);
+      setDataAvulsa('');
+      
+      // Salvar no banco como dia avulso
+      await axios.post('/api/escala/avulsos', {
+        data: dataAvulsa,
+        mes: mesSelecionado,
+        dia_semana: diaSemana,
+      });
+      
+      setMensagem('Data avulsa adicionada com sucesso!');
+      setMensagemTipo('success');
+    } catch (error) {
+      console.error('Erro ao adicionar data avulsa:', error);
+      setMensagem(error.response?.data?.error || 'Erro ao adicionar data avulsa');
+      setMensagemTipo('error');
+    }
+  };
+
+  const handleRemoverDataAvulsa = async (data) => {
+    if (!confirm(`Tem certeza que deseja remover a data avulsa ${format(parseISO(data), 'dd/MM/yyyy')}?`)) return;
+
+    try {
+      await axios.delete(`/api/escala/avulsos?data=${data}`);
+      
+      // Remover da lista
+      setDiasEscala(diasEscala.filter(d => d.data !== data));
+      setDiasAvulsos(diasAvulsos.filter(d => d.data !== data));
+      
+      setMensagem('Data avulsa removida com sucesso!');
+      setMensagemTipo('success');
+    } catch (error) {
+      console.error('Erro ao remover data avulsa:', error);
+      setMensagem(error.response?.data?.error || 'Erro ao remover data avulsa');
+      setMensagemTipo('error');
+    }
+  };
+
   const handleImprimir = () => {
     window.print();
   };
 
   const getMembrosByHabilidade = (habilidade) => {
     return membrosPorHabilidade[habilidade] || [];
+  };
+
+  // Verificar se uma data é avulsa
+  const isDataAvulsa = (data) => {
+    return diasAvulsos.some(d => d.data === data);
   };
 
   if (loading) {
@@ -170,9 +283,10 @@ export default function CriarEscala() {
         <div className="bg-blue-50 p-3 md:p-4 rounded-lg mb-4 md:mb-6 border-l-4 border-blue-500">
           <p className="text-blue-700 text-sm font-medium">📌 Instruções:</p>
           <p className="text-blue-600 text-xs md:text-sm">Selecione um mês para preencher a escala. Os dias disponíveis são <strong>quartas-feiras</strong> e <strong>domingos</strong>.</p>
-          <p className="text-blue-600 text-xs md:text-sm mt-1">💡 Cada lista mostra apenas membros que possuem a habilidade específica.</p>
+          <p className="text-blue-600 text-xs md:text-sm mt-1">💡 <strong>Data Avulsa:</strong> Você pode adicionar datas extras no mês (ex: eventos especiais, ensaios, etc.)</p>
         </div>
 
+        {/* Filtro de Mês */}
         <div className="bg-white rounded-lg shadow-sm p-4 mb-4 md:mb-6">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[200px]">
@@ -190,11 +304,35 @@ export default function CriarEscala() {
           </div>
         </div>
 
+        {/* Adicionar Data Avulsa */}
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-4 md:mb-6 border-2 border-dashed border-indigo-300">
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-sm font-medium text-gray-700 mb-1">➕ Data Avulsa</label>
+              <input
+                type="date"
+                value={dataAvulsa}
+                onChange={(e) => setDataAvulsa(e.target.value)}
+                min={`${mesSelecionado}-01`}
+                max={`${mesSelecionado}-${format(endOfMonth(new Date(mesSelecionado + '-01')), 'dd')}`}
+                className="input-field"
+              />
+            </div>
+            <button onClick={handleAdicionarDataAvulsa} className="btn-success">
+              ➕ Adicionar
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            💡 Adicione datas extras (ex: ensaios, eventos especiais, cultos extras)
+          </p>
+        </div>
+
         {diasEscala.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-12 text-center">
             <div className="text-5xl mb-4">📅</div>
             <h3 className="text-xl font-semibold text-gray-700 mb-2">Nenhum dia de escala encontrado</h3>
             <p className="text-gray-500">Os dias de escala são apenas <strong>quartas-feiras</strong> e <strong>domingos</strong>.</p>
+            <p className="text-gray-500 mt-2">Use a opção <strong>"Data Avulsa"</strong> acima para adicionar dias extras.</p>
           </div>
         ) : (
           <form onSubmit={handleSalvar} className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -204,6 +342,7 @@ export default function CriarEscala() {
                   <tr>
                     <th className="px-2 md:px-3 py-2 text-center">Data</th>
                     <th className="px-2 md:px-3 py-2 text-center hidden sm:table-cell">Dia</th>
+                    <th className="px-2 md:px-3 py-2 text-center hidden sm:table-cell">Tipo</th>
                     <th className="px-2 md:px-3 py-2 text-center">Voz 1</th>
                     <th className="px-2 md:px-3 py-2 text-center">Voz 2</th>
                     <th className="px-2 md:px-3 py-2 text-center hidden md:table-cell">Violão</th>
@@ -211,13 +350,15 @@ export default function CriarEscala() {
                     <th className="px-2 md:px-3 py-2 text-center hidden xl:table-cell">Baixo</th>
                     <th className="px-2 md:px-3 py-2 text-center hidden xl:table-cell">Bateria</th>
                     <th className="px-2 md:px-3 py-2 text-center hidden 2xl:table-cell">Teclado</th>
+                    <th className="px-2 md:px-3 py-2 text-center">Ação</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {diasEscala.map((dia) => {
                     const escalaData = getEscalaData(dia.data);
+                    const avulsa = isDataAvulsa(dia.data);
                     return (
-                      <tr key={dia.data} className="hover:bg-gray-50">
+                      <tr key={dia.data} className={`hover:bg-gray-50 ${avulsa ? 'bg-purple-50' : ''}`}>
                         <td className="px-2 md:px-3 py-2 text-center font-medium whitespace-nowrap">
                           {format(parseISO(dia.data), 'dd/MM/yyyy')}
                           {escalaData && (
@@ -226,6 +367,13 @@ export default function CriarEscala() {
                         </td>
                         <td className="px-2 md:px-3 py-2 text-center text-indigo-600 font-medium hidden sm:table-cell whitespace-nowrap">
                           {dia.dia_semana}
+                        </td>
+                        <td className="px-2 md:px-3 py-2 text-center hidden sm:table-cell">
+                          {avulsa ? (
+                            <span className="inline-block px-2 py-0.5 bg-purple-500 text-white text-xs rounded-full">Avulsa</span>
+                          ) : (
+                            <span className="inline-block px-2 py-0.5 bg-gray-400 text-white text-xs rounded-full">Regular</span>
+                          )}
                         </td>
                         {Object.entries(CAMPOS_HABILIDADES).map(([campo, habilidade]) => {
                           const membrosHab = getMembrosByHabilidade(habilidade);
@@ -250,6 +398,18 @@ export default function CriarEscala() {
                             </td>
                           );
                         })}
+                        <td className="px-2 md:px-3 py-2 text-center">
+                          {avulsa && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoverDataAvulsa(dia.data)}
+                              className="text-red-500 hover:text-red-700 text-sm"
+                              title="Remover data avulsa"
+                            >
+                              🗑️
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -287,6 +447,7 @@ export default function CriarEscala() {
           th { background: #333 !important; color: white !important; }
           select { border: none !important; background: transparent !important; -webkit-appearance: none !important; appearance: none !important; }
           .bg-indigo-600 { background: #333 !important; }
+          .bg-purple-50 { background: #f9f5ff !important; }
         }
       `}</style>
     </Layout>
