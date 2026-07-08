@@ -50,14 +50,15 @@ export default function CriarEscala() {
     const checkAuth = async () => {
       try {
         await axios.get('/api/auth/me');
-        await carregarDados();
       } catch (error) {
         router.push('/login');
-      } finally {
-        setLoading(false);
       }
     };
     checkAuth();
+  }, []);
+
+  useEffect(() => {
+    carregarDados();
   }, [mesSelecionado]);
 
   const carregarDados = async () => {

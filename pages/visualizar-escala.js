@@ -24,15 +24,15 @@ export default function VisualizarEscala() {
         if (res.data && res.data.membro) {
           setMembroLogado(res.data.membro);
         }
-        
-        await loadEscalas();
       } catch (error) {
         router.push('/login');
-      } finally {
-        setLoading(false);
       }
     };
     checkAuth();
+  }, []);
+
+  useEffect(() => {
+    loadEscalas();
   }, [mesSelecionado]);
 
   const loadEscalas = async () => {
