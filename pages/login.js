@@ -22,7 +22,7 @@ export default function Login() {
     try {
       const res = await axios.post('/api/auth/login', { email, senha });
       if (res.data.success) {
-        router.push('/');
+        window.location.href = '/';
       }
     } catch (error) {
       setError(error.response?.data?.error || 'Erro ao fazer login');
