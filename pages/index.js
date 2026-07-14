@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import axios from 'axios';
 import { format, parseISO, isToday, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useUser } from '../contexts/UserContext';
 
 // Cache para dados do dashboard
 let dashboardCache = null;
@@ -12,7 +13,7 @@ const DASHBOARD_CACHE_TTL = 60000; // 1 minuto
 
 export default function Dashboard() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
+  const { user, isAuthenticated } = useUser();
   const [membroLogado, setMembroLogado] = useState(null);
   const [escalas, setEscalas] = useState([]);
   const [proximos, setProximos] = useState([]);
@@ -21,7 +22,7 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('proximos'); // 'proximos' ou 'mes'
 
-  const loadData = useCallback(async (forceRefresh = false) => {
+  const loadData = useCallback(async (currentUser, forceRefresh = false) => {
     const now = Date.now();
     if (!forceRefresh && dashboardCache && (now - dashboardCacheTime) < DASHBOARD_CACHE_TTL) {
       const cached = dashboardCache;
@@ -49,13 +50,13 @@ export default function Dashboard() {
       
       // Encontrar membro vinculado ao usuário logado
       let membro = null;
-      if (user && user.id) {
-        membro = membrosData.find(m => m.usuario_id === user.id) || null;
+      if (currentUser && currentUser.id) {
+        membro = membrosData.find(m => m.usuario_id === currentUser.id) || null;
       }
       
       // Se o usuário já tem a informação do membro no objeto user
-      if (user && user.membro) {
-        membro = user.membro;
+      if (currentUser && currentUser.membro) {
+        membro = currentUser.membro;
       }
       
       const hoje = format(new Date(), 'yyyy-MM-dd');
@@ -79,23 +80,16 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await axios.get('/api/auth/me');
-        setUser(res.data);
-        if (res.data && res.data.membro) {
-          setMembroLogado(res.data.membro);
-        }
-        await loadData();
-      } catch (error) {
-        router.push('/login');
+    if (isAuthenticated && user) {
+      if (user.membro) {
+        setMembroLogado(user.membro);
       }
-    };
-    checkAuth();
-  }, [loadData]);
+      loadData(user);
+    }
+  }, [isAuthenticated, user, loadData]);
 
   const formatarData = (data) => format(parseISO(data), 'dd/MM/yyyy');
   const formatarDataExtenso = (data) => format(parseISO(data), "EEEE, dd 'de' MMMM", { locale: ptBR });
@@ -206,7 +200,7 @@ export default function Dashboard() {
       <Layout>
         <div className="p-4 bg-red-50 text-red-600 rounded-lg">
           <p>{error}</p>
-          <button onClick={() => loadData(true)} className="mt-2 btn-primary">Tentar novamente</button>
+          <button onClick={() => loadData(user, true)} className="mt-2 btn-primary">Tentar novamente</button>
         </div>
       </Layout>
     );
