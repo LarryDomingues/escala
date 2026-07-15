@@ -68,7 +68,6 @@ export default function PlaylistPage() {
     }
   };
 
-  // 🔥 FUNÇÃO CORRIGIDA PARA SALVAR ANOTAÇÃO
   const handleSalvarAnotacao = async (data, anotacaoTexto) => {
     try {
       const res = await axios.post('/api/playlist/anotacao', { 
@@ -133,14 +132,12 @@ export default function PlaylistPage() {
     return false;
   };
 
-  // 🔥 FUNÇÃO PARA INICIAR EDIÇÃO DA ANOTAÇÃO
   const iniciarEdicaoAnotacao = (escala) => {
     setEditandoAnotacao(escala.id);
     setAnotacao(escala.anotacao || '');
     setAnotacaoOriginal(escala.anotacao || '');
   };
 
-  // 🔥 FUNÇÃO PARA CANCELAR EDIÇÃO
   const cancelarEdicaoAnotacao = () => {
     setEditandoAnotacao(null);
     setAnotacao('');
@@ -176,13 +173,18 @@ export default function PlaylistPage() {
           </div>
         </div>
 
+        {/* Filtro de Mês - SEM BOTÃO CARREGAR */}
         <div className="bg-white rounded-lg shadow-sm p-4 mb-4 md:mb-6">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[200px]">
               <label className="block text-sm font-medium text-gray-700 mb-1">📅 Selecione o Mês</label>
-              <input type="month" value={mesSelecionado} onChange={(e) => setMesSelecionado(e.target.value)} className="input-field" />
+              <input
+                type="month"
+                value={mesSelecionado}
+                onChange={(e) => setMesSelecionado(e.target.value)}
+                className="input-field"
+              />
             </div>
-            <button onClick={loadPlaylist} className="btn-primary">Carregar</button>
           </div>
         </div>
 
@@ -263,7 +265,7 @@ export default function PlaylistPage() {
                     </div>
                   </div>
 
-                  {/* 🔥 CAMPO DE ANOTAÇÕES - CORRIGIDO */}
+                  {/* Campo de Anotações */}
                   <div className="mt-3 pt-3 border-t border-gray-200">
                     <div className="flex items-start gap-2">
                       <span className="text-gray-500 text-sm mt-1">📝</span>

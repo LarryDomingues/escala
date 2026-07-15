@@ -173,6 +173,7 @@ export default function VisualizarEscala() {
           <span className="text-sm text-yellow-800 ml-2">📝 <strong>Anotações:</strong> Clique no ícone 📝 para ver observações sobre os louvores</span>
         </div>
 
+        {/* Filtro de Mês - SEM BOTÃO VISUALIZAR */}
         <div className="bg-white rounded-lg shadow-sm p-4 mb-4 md:mb-6">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[200px]">
@@ -184,7 +185,6 @@ export default function VisualizarEscala() {
                 className="input-field"
               />
             </div>
-            <button onClick={loadEscalas} className="btn-primary">Visualizar</button>
             <button onClick={handleImprimir} className="btn-purple">🖨️ Imprimir</button>
           </div>
         </div>
