@@ -4,7 +4,6 @@ import Layout from '../components/Layout';
 import axios from 'axios';
 import { format, parseISO, isToday, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useUser } from '../contexts/UserContext';
 
 // Cache para dados do dashboard
 let dashboardCache = null;
@@ -13,7 +12,7 @@ const DASHBOARD_CACHE_TTL = 60000; // 1 minuto
 
 export default function Dashboard() {
   const router = useRouter();
-  const { user, isAuthenticated } = useUser();
+  const [user, setUser] = useState(null);
   const [membroLogado, setMembroLogado] = useState(null);
   const [escalas, setEscalas] = useState([]);
   const [proximos, setProximos] = useState([]);
@@ -21,8 +20,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('proximos'); // 'proximos' ou 'mes'
+  const [anotacaoModal, setAnotacaoModal] = useState(null); // { data, anotacao, dia_semana }
 
-  const loadData = useCallback(async (currentUser, forceRefresh = false) => {
+  const loadData = useCallback(async (forceRefresh = false) => {
     const now = Date.now();
     if (!forceRefresh && dashboardCache && (now - dashboardCacheTime) < DASHBOARD_CACHE_TTL) {
       const cached = dashboardCache;
@@ -50,13 +50,13 @@ export default function Dashboard() {
       
       // Encontrar membro vinculado ao usuário logado
       let membro = null;
-      if (currentUser && currentUser.id) {
-        membro = membrosData.find(m => m.usuario_id === currentUser.id) || null;
+      if (user && user.id) {
+        membro = membrosData.find(m => m.usuario_id === user.id) || null;
       }
       
       // Se o usuário já tem a informação do membro no objeto user
-      if (currentUser && currentUser.membro) {
-        membro = currentUser.membro;
+      if (user && user.membro) {
+        membro = user.membro;
       }
       
       const hoje = format(new Date(), 'yyyy-MM-dd');
@@ -80,19 +80,25 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
-    if (isAuthenticated && user) {
-      if (user.membro) {
-        setMembroLogado(user.membro);
+    const checkAuth = async () => {
+      try {
+        const res = await axios.get('/api/auth/me');
+        setUser(res.data);
+        if (res.data && res.data.membro) {
+          setMembroLogado(res.data.membro);
+        }
+        await loadData();
+      } catch (error) {
+        router.push('/login');
       }
-      loadData(user);
-    }
-  }, [isAuthenticated, user, loadData]);
+    };
+    checkAuth();
+  }, [loadData]);
 
   const formatarData = (data) => format(parseISO(data), 'dd/MM/yyyy');
-  const formatarDataExtenso = (data) => format(parseISO(data), "EEEE, dd 'de' MMMM", { locale: ptBR });
 
   const getYouTubeLink = (link) => {
     if (!link) return null;
@@ -111,11 +117,9 @@ export default function Dashboard() {
   const isEventoEspecial = (escala) => {
     if (!escala) return false;
     
-    // Verificar se todos os campos estão vazios
     const campos = ['voz_nome', 'voz2_nome', 'violao_nome', 'guitarra_nome', 'baixo_nome', 'bateria_nome', 'teclado_nome'];
     const todosVazios = campos.every(campo => !escala[campo]);
     
-    // Verificar se o dia_semana contém palavras-chave
     const palavrasChave = ['Reunião', 'Zeladoria', 'Culto', 'Evento', 'Especial'];
     const temPalavraChave = palavrasChave.some(palavra => 
       escala.dia_semana?.includes(palavra) || 
@@ -185,6 +189,16 @@ export default function Dashboard() {
   // Número de eventos onde o usuário está escalado
   const eventosEscalados = escalas.filter(e => isUsuarioEscalado(e)).length;
 
+  // Abrir modal de anotação
+  const abrirAnotacao = (data, anotacao, diaSemana) => {
+    setAnotacaoModal({ data, anotacao, dia_semana: diaSemana });
+  };
+
+  // Fechar modal
+  const fecharAnotacao = () => {
+    setAnotacaoModal(null);
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -200,7 +214,7 @@ export default function Dashboard() {
       <Layout>
         <div className="p-4 bg-red-50 text-red-600 rounded-lg">
           <p>{error}</p>
-          <button onClick={() => loadData(user, true)} className="mt-2 btn-primary">Tentar novamente</button>
+          <button onClick={() => loadData(true)} className="mt-2 btn-primary">Tentar novamente</button>
         </div>
       </Layout>
     );
@@ -326,6 +340,7 @@ export default function Dashboard() {
                 const instrumento = getInstrumentoUsuario(escala);
                 const youtubeLink = getYouTubeLink(escala.link_youtube);
                 const isPastDate = isPast(parseISO(escala.data + 'T00:00:00')) && !isToday(parseISO(escala.data + 'T00:00:00'));
+                const temAnotacao = escala.anotacao && escala.anotacao.trim() !== '';
 
                 return (
                   <div 
@@ -363,6 +378,15 @@ export default function Dashboard() {
                             <span className="inline-block px-2 py-0.5 bg-purple-500 text-white text-xs rounded-full">
                               {tipoEvento.icon} {tipoEvento.label}
                             </span>
+                          )}
+                          {temAnotacao && (
+                            <button
+                              onClick={() => abrirAnotacao(escala.data, escala.anotacao, escala.dia_semana)}
+                              className="text-yellow-600 hover:text-yellow-800 text-sm transition-transform hover:scale-110"
+                              title="Ver anotação"
+                            >
+                              📝
+                            </button>
                           )}
                         </div>
                       </div>
@@ -428,8 +452,54 @@ export default function Dashboard() {
           <span>🔴 Hoje</span>
           <span>✓ Realizado</span>
           <span>⭐ Pulsante</span>
+          <span className="flex items-center gap-1">
+            <span className="text-yellow-600">📝</span> Anotação
+          </span>
         </div>
       </div>
+
+      {/* MODAL DE ANOTAÇÃO */}
+      {anotacaoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">
+                📝 Anotação - {formatarData(anotacaoModal.data)}
+                {anotacaoModal.dia_semana && (
+                  <span className="text-sm font-normal text-gray-500 ml-2">
+                    ({anotacaoModal.dia_semana})
+                  </span>
+                )}
+              </h3>
+              <button
+                onClick={fecharAnotacao}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="mb-4">
+              {anotacaoModal.anotacao ? (
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">
+                    {anotacaoModal.anotacao}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-gray-400 text-sm">Nenhuma anotação para esta data.</p>
+              )}
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={fecharAnotacao}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Estilos para o destaque pulsante */}
       <style jsx global>{`
