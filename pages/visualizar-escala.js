@@ -14,6 +14,7 @@ export default function VisualizarEscala() {
   const [mesSelecionado, setMesSelecionado] = useState(format(new Date(), 'yyyy-MM'));
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
+  const [anotacaoModal, setAnotacaoModal] = useState(null); // { data, anotacao }
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -97,6 +98,16 @@ export default function VisualizarEscala() {
   const nomeMes = format(new Date(mesSelecionado + '-01'), 'MMMM', { locale: ptBR });
   const anoMes = format(new Date(mesSelecionado + '-01'), 'yyyy');
 
+  // Abrir modal de anotação
+  const abrirAnotacao = (data, anotacao) => {
+    setAnotacaoModal({ data, anotacao });
+  };
+
+  // Fechar modal
+  const fecharAnotacao = () => {
+    setAnotacaoModal(null);
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -159,6 +170,7 @@ export default function VisualizarEscala() {
             ⭐ Nome do Membro <span className="bg-white/30 px-1.5 py-0.5 rounded text-xs">(EU)</span>
           </span>
           <span className="text-sm text-yellow-800">→ Seu nome aparece destacado em <strong>laranja</strong> com efeito <strong>pulsante</strong></span>
+          <span className="text-sm text-yellow-800 ml-2">📝 <strong>Anotações:</strong> Clique no ícone 📝 para ver observações sobre os louvores</span>
         </div>
 
         <div className="bg-white rounded-lg shadow-sm p-4 mb-4 md:mb-6">
@@ -221,6 +233,7 @@ export default function VisualizarEscala() {
                     <th className="px-2 md:px-4 py-2 text-center">Bateria</th>
                     <th className="px-2 md:px-4 py-2 text-center">Teclado</th>
                     <th className="px-2 md:px-4 py-2 text-center">Vídeo</th>
+                    <th className="px-2 md:px-4 py-2 text-center">📝</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -234,6 +247,7 @@ export default function VisualizarEscala() {
                       e.bateria_id === membroLogado.id ||
                       e.teclado_id === membroLogado.id
                     );
+                    const temAnotacao = e.anotacao && e.anotacao.trim() !== '';
                     return (
                       <tr key={i} className={`hover:bg-gray-50 ${estaEscalado ? 'bg-yellow-50' : ''}`}>
                         <td className="px-2 md:px-4 py-2 text-center font-medium whitespace-nowrap">{formatarData(e.data)}</td>
@@ -271,6 +285,19 @@ export default function VisualizarEscala() {
                             </a>
                           )}
                         </td>
+                        <td className="px-2 md:px-4 py-2 text-center">
+                          {temAnotacao ? (
+                            <button
+                              onClick={() => abrirAnotacao(e.data, e.anotacao)}
+                              className="text-yellow-600 hover:text-yellow-800 text-lg transition-transform hover:scale-110"
+                              title="Ver anotação"
+                            >
+                              📝
+                            </button>
+                          ) : (
+                            <span className="text-gray-300 text-sm">--</span>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -290,6 +317,7 @@ export default function VisualizarEscala() {
                   e.bateria_id === membroLogado.id ||
                   e.teclado_id === membroLogado.id
                 );
+                const temAnotacao = e.anotacao && e.anotacao.trim() !== '';
                 return (
                   <div key={i} className={`p-3 ${estaEscalado ? 'bg-yellow-50 border-l-4 border-orange-400' : ''}`}>
                     <div className="flex justify-between items-start mb-1">
@@ -354,9 +382,19 @@ export default function VisualizarEscala() {
                         )}
                       </div>
                     </div>
-                    {estaEscalado && (
-                      <div className="mt-1 text-xs text-orange-600 font-medium">⭐ Você está escalado aqui</div>
-                    )}
+                    <div className="flex items-center justify-between mt-2">
+                      {estaEscalado && (
+                        <span className="text-xs text-orange-600 font-medium">⭐ Você está escalado aqui</span>
+                      )}
+                      {temAnotacao && (
+                        <button
+                          onClick={() => abrirAnotacao(e.data, e.anotacao)}
+                          className="text-yellow-600 hover:text-yellow-800 text-sm flex items-center gap-1"
+                        >
+                          📝 Anotação
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -364,6 +402,44 @@ export default function VisualizarEscala() {
           </div>
         )}
       </div>
+
+      {/* MODAL DE ANOTAÇÃO */}
+      {anotacaoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">
+                📝 Anotação - {formatarData(anotacaoModal.data)}
+              </h3>
+              <button
+                onClick={fecharAnotacao}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="mb-4">
+              {anotacaoModal.anotacao ? (
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">
+                    {anotacaoModal.anotacao}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-gray-400 text-sm">Nenhuma anotação para esta data.</p>
+              )}
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={fecharAnotacao}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* DIV OCULTA PARA IMPRESSÃO - SOMENTE A ESCALA */}
       <div id="print-content" style={{ display: 'none' }}>
@@ -454,12 +530,10 @@ export default function VisualizarEscala() {
 
         /* ESTILOS PARA IMPRESSÃO */
         @media print {
-          /* Esconder tudo da página */
           body * {
             visibility: hidden;
           }
           
-          /* Mostrar apenas o conteúdo de impressão */
           #print-content,
           #print-content * {
             visibility: visible;
@@ -524,7 +598,6 @@ export default function VisualizarEscala() {
             color: #999;
           }
 
-          /* Esconder elementos da interface */
           .sidebar,
           .mobile-header,
           .menu-toggle-btn,
@@ -540,13 +613,11 @@ export default function VisualizarEscala() {
             display: none !important;
           }
 
-          /* Garantir que a tabela de impressão seja mostrada */
           .print-table {
             display: table !important;
           }
         }
 
-        /* Versão para visualização na tela - esconder div de impressão */
         #print-content {
           display: none !important;
         }

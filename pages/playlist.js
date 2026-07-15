@@ -12,6 +12,9 @@ export default function PlaylistPage() {
   const [mesSelecionado, setMesSelecionado] = useState(format(new Date(), 'yyyy-MM'));
   const [editando, setEditando] = useState(null);
   const [linkYoutube, setLinkYoutube] = useState('');
+  const [anotacao, setAnotacao] = useState('');
+  const [editandoAnotacao, setEditandoAnotacao] = useState(null);
+  const [anotacaoOriginal, setAnotacaoOriginal] = useState('');
   const [mensagem, setMensagem] = useState('');
   const [mensagemTipo, setMensagemTipo] = useState('');
   const [usuarioInfo, setUsuarioInfo] = useState(null);
@@ -48,7 +51,10 @@ export default function PlaylistPage() {
 
   const handleSalvarLink = async (data) => {
     try {
-      const res = await axios.post('/api/playlist', { data, link_youtube: linkYoutube });
+      const res = await axios.post('/api/playlist', { 
+        data, 
+        link_youtube: linkYoutube 
+      });
       if (res.data.success) {
         setMensagem(res.data.message);
         setMensagemTipo('success');
@@ -58,6 +64,27 @@ export default function PlaylistPage() {
       }
     } catch (error) {
       setMensagem(error.response?.data?.error || 'Erro ao salvar link');
+      setMensagemTipo('error');
+    }
+  };
+
+  // 🔥 FUNÇÃO CORRIGIDA PARA SALVAR ANOTAÇÃO
+  const handleSalvarAnotacao = async (data, anotacaoTexto) => {
+    try {
+      const res = await axios.post('/api/playlist/anotacao', { 
+        data, 
+        anotacao: anotacaoTexto 
+      });
+      if (res.data.success) {
+        setMensagem(res.data.message);
+        setMensagemTipo('success');
+        setEditandoAnotacao(null);
+        setAnotacao('');
+        await loadPlaylist();
+      }
+    } catch (error) {
+      console.error('Erro ao salvar anotação:', error);
+      setMensagem(error.response?.data?.error || 'Erro ao salvar anotação');
       setMensagemTipo('error');
     }
   };
@@ -104,6 +131,20 @@ export default function PlaylistPage() {
     if (user?.nivel === 'coordenador' && isUsuarioEscalado(escala)) return true;
     if (user?.nivel === 'membro' && isUsuarioEscalado(escala)) return true;
     return false;
+  };
+
+  // 🔥 FUNÇÃO PARA INICIAR EDIÇÃO DA ANOTAÇÃO
+  const iniciarEdicaoAnotacao = (escala) => {
+    setEditandoAnotacao(escala.id);
+    setAnotacao(escala.anotacao || '');
+    setAnotacaoOriginal(escala.anotacao || '');
+  };
+
+  // 🔥 FUNÇÃO PARA CANCELAR EDIÇÃO
+  const cancelarEdicaoAnotacao = () => {
+    setEditandoAnotacao(null);
+    setAnotacao('');
+    setAnotacaoOriginal('');
   };
 
   return (
@@ -196,6 +237,7 @@ export default function PlaylistPage() {
                       </div>
                     </div>
 
+                    {/* Link do YouTube */}
                     <div className="flex-1 min-w-[200px] flex flex-wrap items-center gap-2 md:gap-3">
                       {escala.link_youtube ? (
                         <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-[180px] bg-blue-50 p-2 rounded-lg flex-wrap">
@@ -218,6 +260,70 @@ export default function PlaylistPage() {
                           </div>
                         )
                       )}
+                    </div>
+                  </div>
+
+                  {/* 🔥 CAMPO DE ANOTAÇÕES - CORRIGIDO */}
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <div className="flex items-start gap-2">
+                      <span className="text-gray-500 text-sm mt-1">📝</span>
+                      <div className="flex-1">
+                        {editandoAnotacao === escala.id ? (
+                          <div className="flex flex-col gap-2">
+                            <textarea
+                              value={anotacao}
+                              onChange={(e) => setAnotacao(e.target.value)}
+                              placeholder="Adicione observações sobre os louvores, músicas, dicas, etc."
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm min-h-[60px]"
+                              rows={2}
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleSalvarAnotacao(escala.data, anotacao)}
+                                className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-xs"
+                              >
+                                💾 Salvar
+                              </button>
+                              <button
+                                onClick={cancelarEdicaoAnotacao}
+                                className="px-3 py-1.5 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition text-xs"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            {escala.anotacao ? (
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded-lg flex-1 whitespace-pre-wrap">
+                                  {escala.anotacao}
+                                </p>
+                                {podeEditarLink && (
+                                  <button
+                                    onClick={() => iniciarEdicaoAnotacao(escala)}
+                                    className="text-indigo-600 hover:text-indigo-800 text-xs px-2 py-1 whitespace-nowrap"
+                                  >
+                                    ✏️ Editar
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              podeEditarLink && (
+                                <button
+                                  onClick={() => iniciarEdicaoAnotacao(escala)}
+                                  className="text-xs text-gray-400 hover:text-indigo-600 transition"
+                                >
+                                  ➕ Adicionar anotação
+                                </button>
+                              )
+                            )}
+                            {!podeEditarLink && !escala.anotacao && (
+                              <span className="text-xs text-gray-400">Sem anotações</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

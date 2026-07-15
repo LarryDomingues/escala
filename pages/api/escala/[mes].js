@@ -67,6 +67,7 @@ export default async function handler(req, res) {
         teclado_id: escala.teclado_id?._id || null,
         teclado_nome: escala.teclado_id?.nome || null,
         link_youtube: escala.link_youtube || null,
+        anotacao: escala.anotacao || null,
       })),
       membros: membros.map(m => ({ id: m._id, nome: m.nome })),
     };

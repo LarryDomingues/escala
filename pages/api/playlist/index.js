@@ -1,3 +1,4 @@
+// pages/api/playlist/index.js
 import connectDB from '../../../lib/mongodb';
 import Escala from '../../../lib/models/Escala';
 import Membro from '../../../lib/models/Membro';
@@ -93,6 +94,7 @@ export default async function handler(req, res) {
         teclado_id: escala.teclado_id?._id || null,
         teclado_nome: escala.teclado_id?.nome || null,
         link_youtube: escala.link_youtube || null,
+        anotacao: escala.anotacao || null, // 🔥 ADICIONADO
         esta_escalado: membroId ? verificarSeEstaEscalado(escala, membroId) : false,
         pode_editar: user.nivel === 'admin' || (membroId && verificarSeEstaEscalado(escala, membroId)),
       }));
@@ -107,6 +109,7 @@ export default async function handler(req, res) {
     }
   }
 
+  // POST - Salvar link do YouTube
   if (req.method === 'POST') {
     try {
       const { data, link_youtube } = req.body;
