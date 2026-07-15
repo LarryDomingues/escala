@@ -22,7 +22,7 @@ export default function Dashboard() {
   const [viewMode, setViewMode] = useState('proximos'); // 'proximos' ou 'mes'
   const [anotacaoModal, setAnotacaoModal] = useState(null); // { data, anotacao, dia_semana }
 
-  const loadData = useCallback(async (forceRefresh = false) => {
+  const loadData = useCallback(async (currentUser, forceRefresh = false) => {
     const now = Date.now();
     if (!forceRefresh && dashboardCache && (now - dashboardCacheTime) < DASHBOARD_CACHE_TTL) {
       const cached = dashboardCache;
@@ -40,23 +40,19 @@ export default function Dashboard() {
     try {
       const mesAtual = format(new Date(), 'yyyy-MM');
       
-      // Buscar escalas do mês
       const escalasRes = await axios.get(`/api/escala?mes=${mesAtual}`);
       const escalasData = escalasRes.data;
       
-      // Buscar membros
       const membrosRes = await axios.get('/api/membros');
       const membrosData = membrosRes.data;
       
-      // Encontrar membro vinculado ao usuário logado
       let membro = null;
-      if (user && user.id) {
-        membro = membrosData.find(m => m.usuario_id === user.id) || null;
+      if (currentUser && currentUser.id) {
+        membro = membrosData.find(m => m.usuario_id === currentUser.id) || null;
       }
       
-      // Se o usuário já tem a informação do membro no objeto user
-      if (user && user.membro) {
-        membro = user.membro;
+      if (currentUser && currentUser.membro) {
+        membro = currentUser.membro;
       }
       
       const hoje = format(new Date(), 'yyyy-MM-dd');
@@ -80,7 +76,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -90,13 +86,13 @@ export default function Dashboard() {
         if (res.data && res.data.membro) {
           setMembroLogado(res.data.membro);
         }
-        await loadData();
+        await loadData(res.data);
       } catch (error) {
         router.push('/login');
       }
     };
     checkAuth();
-  }, [loadData]);
+  }, []);
 
   const formatarData = (data) => format(parseISO(data), 'dd/MM/yyyy');
 
@@ -214,7 +210,7 @@ export default function Dashboard() {
       <Layout>
         <div className="p-4 bg-red-50 text-red-600 rounded-lg">
           <p>{error}</p>
-          <button onClick={() => loadData(true)} className="mt-2 btn-primary">Tentar novamente</button>
+          <button onClick={() => loadData(user, true)} className="mt-2 btn-primary">Tentar novamente</button>
         </div>
       </Layout>
     );
