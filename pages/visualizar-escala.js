@@ -71,6 +71,7 @@ export default function VisualizarEscala() {
   };
 
   const formatarData = (data) => format(parseISO(data), 'dd/MM/yyyy');
+  
   const getYouTubeLink = (link) => {
     if (!link) return null;
     const match = link.match(/(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
@@ -91,6 +92,10 @@ export default function VisualizarEscala() {
   };
 
   const handleImprimir = () => window.print();
+
+  // Nome do mês em português
+  const nomeMes = format(new Date(mesSelecionado + '-01'), 'MMMM', { locale: ptBR });
+  const anoMes = format(new Date(mesSelecionado + '-01'), 'yyyy');
 
   if (loading) {
     return (
@@ -118,35 +123,37 @@ export default function VisualizarEscala() {
       <div className="p-3 md:p-4 max-w-7xl mx-auto">
         <h1 className="text-xl md:text-2xl font-bold text-gray-800 mb-4 md:mb-6">📅 Visualizar Escalas</h1>
 
-        {/* Informação do Usuário Logado */}
-        {membroLogado ? (
-          <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-3 md:p-4 rounded-lg mb-4 md:mb-6 border-l-4 border-orange-400">
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-2xl">⭐</span>
-              <div>
-                <p className="font-medium text-orange-800 text-sm md:text-base">
-                  Você está destacado na escala como <strong>{membroLogado.nome}</strong>
-                  {user?.nivel === 'admin' && <span className="ml-2 text-xs text-gray-500">(Administrador)</span>}
-                  {user?.nivel === 'coordenador' && <span className="ml-2 text-xs text-gray-500">(Coordenador)</span>}
-                </p>
+        {/* Informação do Usuário Logado - Visível apenas em Desktop */}
+        <div className="hidden md:block">
+          {membroLogado ? (
+            <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-3 md:p-4 rounded-lg mb-4 md:mb-6 border-l-4 border-orange-400">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-2xl">⭐</span>
+                <div>
+                  <p className="font-medium text-orange-800 text-sm md:text-base">
+                    Você está destacado na escala como <strong>{membroLogado.nome}</strong>
+                    {user?.nivel === 'admin' && <span className="ml-2 text-xs text-gray-500">(Administrador)</span>}
+                    {user?.nivel === 'coordenador' && <span className="ml-2 text-xs text-gray-500">(Coordenador)</span>}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="bg-gray-50 p-3 md:p-4 rounded-lg mb-4 md:mb-6 border-l-4 border-gray-400">
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-2xl">ℹ️</span>
-              <div>
-                <p className="text-gray-600 text-sm md:text-base">
-                  Você não está vinculado a nenhum membro. Peça ao administrador para vincular seu usuário a um membro.
-                </p>
+          ) : (
+            <div className="bg-gray-50 p-3 md:p-4 rounded-lg mb-4 md:mb-6 border-l-4 border-gray-400">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-2xl">ℹ️</span>
+                <div>
+                  <p className="text-gray-600 text-sm md:text-base">
+                    Você não está vinculado a nenhum membro. Peça ao administrador para vincular seu usuário a um membro.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Legenda */}
-        <div className="bg-yellow-50 p-3 md:p-4 rounded-lg mb-4 md:mb-6 border border-yellow-200 flex items-center gap-3 flex-wrap">
+        {/* Legenda - Visível apenas em Desktop */}
+        <div className="hidden md:block bg-yellow-50 p-3 md:p-4 rounded-lg mb-4 md:mb-6 border border-yellow-200 flex items-center gap-3 flex-wrap">
           <span className="font-medium text-yellow-800">📌 Legenda:</span>
           <span className="inline-block bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold animate-pulse">
             ⭐ Nome do Membro <span className="bg-white/30 px-1.5 py-0.5 rounded text-xs">(EU)</span>
@@ -199,19 +206,20 @@ export default function VisualizarEscala() {
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+            {/* Versão Desktop - Tabela Completa */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-xs md:text-sm">
                 <thead className="bg-indigo-600 text-white">
                   <tr>
                     <th className="px-2 md:px-4 py-2 text-center">Data</th>
-                    <th className="px-2 md:px-4 py-2 text-center hidden sm:table-cell">Dia</th>
+                    <th className="px-2 md:px-4 py-2 text-center">Dia</th>
                     <th className="px-2 md:px-4 py-2 text-center">Voz 1</th>
                     <th className="px-2 md:px-4 py-2 text-center">Voz 2</th>
-                    <th className="px-2 md:px-4 py-2 text-center hidden md:table-cell">Violão</th>
-                    <th className="px-2 md:px-4 py-2 text-center hidden lg:table-cell">Guitarra</th>
-                    <th className="px-2 md:px-4 py-2 text-center hidden xl:table-cell">Baixo</th>
-                    <th className="px-2 md:px-4 py-2 text-center hidden xl:table-cell">Bateria</th>
-                    <th className="px-2 md:px-4 py-2 text-center hidden 2xl:table-cell">Teclado</th>
+                    <th className="px-2 md:px-4 py-2 text-center">Violão</th>
+                    <th className="px-2 md:px-4 py-2 text-center">Guitarra</th>
+                    <th className="px-2 md:px-4 py-2 text-center">Baixo</th>
+                    <th className="px-2 md:px-4 py-2 text-center">Bateria</th>
+                    <th className="px-2 md:px-4 py-2 text-center">Teclado</th>
                     <th className="px-2 md:px-4 py-2 text-center">Vídeo</th>
                   </tr>
                 </thead>
@@ -229,26 +237,26 @@ export default function VisualizarEscala() {
                     return (
                       <tr key={i} className={`hover:bg-gray-50 ${estaEscalado ? 'bg-yellow-50' : ''}`}>
                         <td className="px-2 md:px-4 py-2 text-center font-medium whitespace-nowrap">{formatarData(e.data)}</td>
-                        <td className="px-2 md:px-4 py-2 text-center text-indigo-600 font-medium hidden sm:table-cell whitespace-nowrap">{e.dia_semana}</td>
+                        <td className="px-2 md:px-4 py-2 text-center text-indigo-600 font-medium whitespace-nowrap">{e.dia_semana}</td>
                         <td className="px-2 md:px-4 py-2 text-center">
                           {e.voz_nome ? formatarNomeMembro(e.voz_nome, e.voz_id) : '--'}
                         </td>
                         <td className="px-2 md:px-4 py-2 text-center">
                           {e.voz2_nome ? formatarNomeMembro(e.voz2_nome, e.voz2_id) : '--'}
                         </td>
-                        <td className="px-2 md:px-4 py-2 text-center hidden md:table-cell">
+                        <td className="px-2 md:px-4 py-2 text-center">
                           {e.violao_nome ? formatarNomeMembro(e.violao_nome, e.violao_id) : '--'}
                         </td>
-                        <td className="px-2 md:px-4 py-2 text-center hidden lg:table-cell">
+                        <td className="px-2 md:px-4 py-2 text-center">
                           {e.guitarra_nome ? formatarNomeMembro(e.guitarra_nome, e.guitarra_id) : '--'}
                         </td>
-                        <td className="px-2 md:px-4 py-2 text-center hidden xl:table-cell">
+                        <td className="px-2 md:px-4 py-2 text-center">
                           {e.baixo_nome ? formatarNomeMembro(e.baixo_nome, e.baixo_id) : '--'}
                         </td>
-                        <td className="px-2 md:px-4 py-2 text-center hidden xl:table-cell">
+                        <td className="px-2 md:px-4 py-2 text-center">
                           {e.bateria_nome ? formatarNomeMembro(e.bateria_nome, e.bateria_id) : '--'}
                         </td>
-                        <td className="px-2 md:px-4 py-2 text-center hidden 2xl:table-cell">
+                        <td className="px-2 md:px-4 py-2 text-center">
                           {e.teclado_nome ? formatarNomeMembro(e.teclado_nome, e.teclado_id) : '--'}
                         </td>
                         <td className="px-2 md:px-4 py-2 text-center">
@@ -269,11 +277,140 @@ export default function VisualizarEscala() {
                 </tbody>
               </table>
             </div>
+
+            {/* Versão Mobile - Cards */}
+            <div className="md:hidden divide-y divide-gray-200">
+              {escalas.map((e, i) => {
+                const estaEscalado = membroLogado && (
+                  e.voz_id === membroLogado.id ||
+                  e.voz2_id === membroLogado.id ||
+                  e.violao_id === membroLogado.id ||
+                  e.guitarra_id === membroLogado.id ||
+                  e.baixo_id === membroLogado.id ||
+                  e.bateria_id === membroLogado.id ||
+                  e.teclado_id === membroLogado.id
+                );
+                return (
+                  <div key={i} className={`p-3 ${estaEscalado ? 'bg-yellow-50 border-l-4 border-orange-400' : ''}`}>
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="font-semibold text-sm">{formatarData(e.data)}</span>
+                      <span className="text-xs text-indigo-600">{e.dia_semana}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1 text-xs mt-1">
+                      <div className="flex items-center gap-1">
+                        <span className="text-gray-500">Voz 1:</span>
+                        <span className="font-medium">
+                          {e.voz_nome ? formatarNomeMembro(e.voz_nome, e.voz_id) : '--'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-gray-500">Voz 2:</span>
+                        <span className="font-medium">
+                          {e.voz2_nome ? formatarNomeMembro(e.voz2_nome, e.voz2_id) : '--'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-gray-500">Violão:</span>
+                        <span className="font-medium">
+                          {e.violao_nome ? formatarNomeMembro(e.violao_nome, e.violao_id) : '--'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-gray-500">Guitarra:</span>
+                        <span className="font-medium">
+                          {e.guitarra_nome ? formatarNomeMembro(e.guitarra_nome, e.guitarra_id) : '--'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-gray-500">Baixo:</span>
+                        <span className="font-medium">
+                          {e.baixo_nome ? formatarNomeMembro(e.baixo_nome, e.baixo_id) : '--'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-gray-500">Bateria:</span>
+                        <span className="font-medium">
+                          {e.bateria_nome ? formatarNomeMembro(e.bateria_nome, e.bateria_id) : '--'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-gray-500">Teclado:</span>
+                        <span className="font-medium">
+                          {e.teclado_nome ? formatarNomeMembro(e.teclado_nome, e.teclado_id) : '--'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 justify-end">
+                        {e.link_youtube ? (
+                          <a
+                            href={getYouTubeLink(e.link_youtube)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                          >
+                            ▶️ Vídeo
+                          </a>
+                        ) : (
+                          <span className="text-gray-300 text-xs">--</span>
+                        )}
+                      </div>
+                    </div>
+                    {estaEscalado && (
+                      <div className="mt-1 text-xs text-orange-600 font-medium">⭐ Você está escalado aqui</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Estilos para o destaque pulsante */}
+      {/* DIV OCULTA PARA IMPRESSÃO - SOMENTE A ESCALA */}
+      <div id="print-content" style={{ display: 'none' }}>
+        <div className="print-header">
+          <h1 style={{ fontSize: '24px', margin: '0', textAlign: 'center' }}>Ministério de Louvor</h1>
+          <p style={{ fontSize: '14px', color: '#666', margin: '5px 0 15px', textAlign: 'center' }}>
+            {nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1)} / {anoMes}
+          </p>
+        </div>
+
+        <table className="print-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Dia</th>
+              <th>Voz 1</th>
+              <th>Voz 2</th>
+              <th>Violão</th>
+              <th>Guitarra</th>
+              <th>Baixo</th>
+              <th>Bateria</th>
+              <th>Teclado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {escalas.map((e, i) => (
+              <tr key={i}>
+                <td>{formatarData(e.data)}</td>
+                <td>{e.dia_semana}</td>
+                <td>{e.voz_nome || '--'}</td>
+                <td>{e.voz2_nome || '--'}</td>
+                <td>{e.violao_nome || '--'}</td>
+                <td>{e.guitarra_nome || '--'}</td>
+                <td>{e.baixo_nome || '--'}</td>
+                <td>{e.bateria_nome || '--'}</td>
+                <td>{e.teclado_nome || '--'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div className="print-footer">
+          Gerado em {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}
+        </div>
+      </div>
+
+      {/* Estilos para o destaque pulsante e impressão */}
       <style jsx global>{`
         .membro-destaque {
           display: inline-block;
@@ -313,6 +450,105 @@ export default function VisualizarEscala() {
         }
         .bg-yellow-50 {
           background-color: #fffbeb !important;
+        }
+
+        /* ESTILOS PARA IMPRESSÃO */
+        @media print {
+          /* Esconder tudo da página */
+          body * {
+            visibility: hidden;
+          }
+          
+          /* Mostrar apenas o conteúdo de impressão */
+          #print-content,
+          #print-content * {
+            visibility: visible;
+          }
+          
+          #print-content {
+            display: block !important;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            padding: 30px 40px;
+            background: white;
+          }
+
+          .print-header h1 {
+            font-size: 24px;
+            text-align: center;
+            margin: 0 0 5px 0;
+            color: #000;
+            font-weight: bold;
+          }
+
+          .print-header p {
+            font-size: 14px;
+            text-align: center;
+            color: #666;
+            margin: 0 0 20px 0;
+          }
+
+          .print-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+          }
+
+          .print-table th {
+            background: #333 !important;
+            color: white !important;
+            padding: 8px 6px;
+            border: 1px solid #333;
+            text-align: center;
+            font-weight: 600;
+          }
+
+          .print-table td {
+            padding: 6px 4px;
+            border: 1px solid #ddd;
+            text-align: center;
+          }
+
+          .print-table tr:nth-child(even) {
+            background: #f9f9f9;
+          }
+
+          .print-footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+            font-size: 11px;
+            color: #999;
+          }
+
+          /* Esconder elementos da interface */
+          .sidebar,
+          .mobile-header,
+          .menu-toggle-btn,
+          .btn-primary,
+          .btn-purple,
+          .filtro-mes,
+          .stats-grid,
+          .legenda-destaque,
+          .info-usuario-destaque,
+          .bg-yellow-50,
+          .hidden.md\\:block,
+          .md\\:hidden {
+            display: none !important;
+          }
+
+          /* Garantir que a tabela de impressão seja mostrada */
+          .print-table {
+            display: table !important;
+          }
+        }
+
+        /* Versão para visualização na tela - esconder div de impressão */
+        #print-content {
+          display: none !important;
         }
       `}</style>
     </Layout>
