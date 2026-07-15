@@ -98,22 +98,21 @@ export default function GerenciarUsuarios() {
     }
   };
 
-  // Função para resetar senha
- const handleResetSenha = async (id, nome) => {
-  if (!confirm(`Tem certeza que deseja resetar a senha do usuário "${nome}"?`)) return;
-  try {
-    const res = await axios.post(`/api/admin/usuarios/${id}/reset-senha`);
-    setNovaSenha(res.data.novaSenha);
-    setUsuarioReset(res.data.usuario);
-    setModalAberto(true);
-    setMensagem(`Senha de ${nome} resetada com sucesso!`);
-    setMensagemTipo('success');
-    await carregarUsuarios();
-  } catch (error) {
-    setMensagem(error.response?.data?.error || 'Erro ao resetar senha');
-    setMensagemTipo('error');
-  }
-  }; 
+  const handleResetSenha = async (id, nome) => {
+    if (!confirm(`Tem certeza que deseja resetar a senha do usuário "${nome}"?`)) return;
+    try {
+      const res = await axios.post(`/api/admin/usuarios/${id}/reset-senha`);
+      setNovaSenha(res.data.novaSenha);
+      setUsuarioReset(res.data.usuario);
+      setModalAberto(true);
+      setMensagem(`Senha de ${nome} resetada com sucesso!`);
+      setMensagemTipo('success');
+      await carregarUsuarios();
+    } catch (error) {
+      setMensagem(error.response?.data?.error || 'Erro ao resetar senha');
+      setMensagemTipo('error');
+    }
+  };
 
   const getStatusBadge = (status) => {
     const classes = {
@@ -160,17 +159,18 @@ export default function GerenciarUsuarios() {
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        {/* Versão Desktop - Tabela */}
+        <div className="hidden md:block bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs md:text-sm">
+            <table className="w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-2 md:px-4 py-2 text-left">Nome</th>
-                  <th className="px-2 md:px-4 py-2 text-left hidden sm:table-cell">Email</th>
-                  <th className="px-2 md:px-4 py-2 text-left">Nível</th>
-                  <th className="px-2 md:px-4 py-2 text-left">Status</th>
-                  <th className="px-2 md:px-4 py-2 text-left hidden md:table-cell">Último Login</th>
-                  <th className="px-2 md:px-4 py-2 text-center min-w-[250px]">Ações</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nível</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Último Login</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -178,92 +178,43 @@ export default function GerenciarUsuarios() {
                   const isCurrentUser = user && usuario.id === user.id;
                   return (
                     <tr key={usuario.id} className="hover:bg-gray-50">
-                      <td className="px-2 md:px-4 py-2 font-medium text-gray-900">
+                      <td className="px-4 py-3 font-medium text-gray-900">
                         {usuario.nome}
                         {isCurrentUser && <span className="ml-2 text-xs text-indigo-600">(Você)</span>}
                       </td>
-                      <td className="px-2 md:px-4 py-2 text-gray-600 hidden sm:table-cell">{usuario.email}</td>
-                      <td className="px-2 md:px-4 py-2">
+                      <td className="px-4 py-3 text-gray-600">{usuario.email}</td>
+                      <td className="px-4 py-3">
                         <span className={getNivelBadge(usuario.nivel)}>{usuario.nivel}</span>
                       </td>
-                      <td className="px-2 md:px-4 py-2">
+                      <td className="px-4 py-3">
                         <span className={getStatusBadge(usuario.status)}>{usuario.status}</span>
                       </td>
-                      <td className="px-2 md:px-4 py-2 text-gray-500 hidden md:table-cell">
-                        {formatarData(usuario.ultimo_login)}
-                      </td>
-                      <td className="px-2 md:px-4 py-2">
-                        <div className="flex flex-wrap items-center justify-center gap-1 md:gap-2">
+                      <td className="px-4 py-3 text-gray-500 text-sm">{formatarData(usuario.ultimo_login)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center justify-center gap-1">
                           {usuario.status === 'pendente' && !isCurrentUser && (
-                            <button
-                              onClick={() => handleAcao(usuario.id, 'ativar', usuario.nome)}
-                              className="bg-green-600 text-white text-xs px-2 py-1 rounded hover:bg-green-700 transition"
-                            >
-                              Ativar
-                            </button>
+                            <button onClick={() => handleAcao(usuario.id, 'ativar', usuario.nome)} className="bg-green-600 text-white text-xs px-2 py-1 rounded hover:bg-green-700 transition">Ativar</button>
                           )}
-
                           {usuario.status === 'ativo' && !isCurrentUser && (
-                            <button
-                              onClick={() => handleAcao(usuario.id, 'bloquear', usuario.nome)}
-                              className="bg-orange-500 text-white text-xs px-2 py-1 rounded hover:bg-orange-600 transition"
-                            >
-                              Bloquear
-                            </button>
+                            <button onClick={() => handleAcao(usuario.id, 'bloquear', usuario.nome)} className="bg-orange-500 text-white text-xs px-2 py-1 rounded hover:bg-orange-600 transition">Bloquear</button>
                           )}
-
                           {usuario.status === 'bloqueado' && !isCurrentUser && (
-                            <button
-                              onClick={() => handleAcao(usuario.id, 'desbloquear', usuario.nome)}
-                              className="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-700 transition"
-                            >
-                              Desbloquear
-                            </button>
+                            <button onClick={() => handleAcao(usuario.id, 'desbloquear', usuario.nome)} className="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-700 transition">Desbloquear</button>
                           )}
-
                           {usuario.nivel !== 'admin' && !isCurrentUser && (
-                            <button
-                              onClick={() => handlePromover(usuario.id, usuario.nivel, usuario.nome)}
-                              className="bg-indigo-600 text-white text-xs px-2 py-1 rounded hover:bg-indigo-700 transition"
-                              title={usuario.nivel === 'membro' ? 'Promover para Coordenador' : 'Promover para Admin'}
-                            >
-                              ↑
-                            </button>
+                            <button onClick={() => handlePromover(usuario.id, usuario.nivel, usuario.nome)} className="bg-indigo-600 text-white text-xs px-2 py-1 rounded hover:bg-indigo-700 transition" title={usuario.nivel === 'membro' ? 'Promover para Coordenador' : 'Promover para Admin'}>↑</button>
                           )}
-
                           {usuario.nivel === 'coordenador' && !isCurrentUser && (
-                            <button
-                              onClick={() => handleRebaixar(usuario.id, usuario.nome)}
-                              className="bg-yellow-600 text-white text-xs px-2 py-1 rounded hover:bg-yellow-700 transition"
-                              title="Rebaixar para Membro"
-                            >
-                              ↓
-                            </button>
+                            <button onClick={() => handleRebaixar(usuario.id, usuario.nome)} className="bg-yellow-600 text-white text-xs px-2 py-1 rounded hover:bg-yellow-700 transition" title="Rebaixar para Membro">↓</button>
                           )}
-
                           {usuario.nivel !== 'admin' && !isCurrentUser && (
-                            <button
-                              onClick={() => handleDeletar(usuario.id, usuario.nome)}
-                              className="bg-red-600 text-white text-xs px-2 py-1 rounded hover:bg-red-700 transition"
-                              title="Deletar Usuário"
-                            >
-                              🗑️
-                            </button>
+                            <button onClick={() => handleDeletar(usuario.id, usuario.nome)} className="bg-red-600 text-white text-xs px-2 py-1 rounded hover:bg-red-700 transition" title="Deletar Usuário">🗑️</button>
                           )}
-
-                          {/* Reset Senha - apenas para admin e não para o próprio usuário */}
                           {!isCurrentUser && (
-                            <button
-                              onClick={() => handleResetSenha(usuario.id, usuario.nome)}
-                              className="bg-purple-600 text-white text-xs px-2 py-1 rounded hover:bg-purple-700 transition"
-                              title="Resetar Senha"
-                            >
-                              🔑
-                            </button>
+                            <button onClick={() => handleResetSenha(usuario.id, usuario.nome)} className="bg-purple-600 text-white text-xs px-2 py-1 rounded hover:bg-purple-700 transition" title="Resetar Senha">🔑</button>
                           )}
-
                           {isCurrentUser && (
-                            <span className="text-xs text-gray-400">Você não pode se modificar</span>
+                            <span className="text-xs text-gray-400">Não pode se modificar</span>
                           )}
                         </div>
                       </td>
@@ -273,6 +224,61 @@ export default function GerenciarUsuarios() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Versão Mobile - Cards */}
+        <div className="md:hidden space-y-3">
+          {usuarios.map((usuario) => {
+            const isCurrentUser = user && usuario.id === user.id;
+            return (
+              <div key={usuario.id} className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <div className="font-semibold text-gray-900 text-base">
+                      {usuario.nome}
+                      {isCurrentUser && <span className="ml-2 text-xs text-indigo-600">(Você)</span>}
+                    </div>
+                    <div className="text-sm text-gray-500">{usuario.email}</div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={getNivelBadge(usuario.nivel)}>{usuario.nivel}</span>
+                    <span className={getStatusBadge(usuario.status)}>{usuario.status}</span>
+                  </div>
+                </div>
+
+                <div className="text-xs text-gray-400 mb-3">
+                  Último login: {formatarData(usuario.ultimo_login)}
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {usuario.status === 'pendente' && !isCurrentUser && (
+                    <button onClick={() => handleAcao(usuario.id, 'ativar', usuario.nome)} className="bg-green-600 text-white text-xs px-2.5 py-1.5 rounded hover:bg-green-700 transition flex-1 min-w-[60px]">Ativar</button>
+                  )}
+                  {usuario.status === 'ativo' && !isCurrentUser && (
+                    <button onClick={() => handleAcao(usuario.id, 'bloquear', usuario.nome)} className="bg-orange-500 text-white text-xs px-2.5 py-1.5 rounded hover:bg-orange-600 transition flex-1 min-w-[60px]">Bloquear</button>
+                  )}
+                  {usuario.status === 'bloqueado' && !isCurrentUser && (
+                    <button onClick={() => handleAcao(usuario.id, 'desbloquear', usuario.nome)} className="bg-blue-600 text-white text-xs px-2.5 py-1.5 rounded hover:bg-blue-700 transition flex-1 min-w-[60px]">Desbloquear</button>
+                  )}
+                  {usuario.nivel !== 'admin' && !isCurrentUser && (
+                    <button onClick={() => handlePromover(usuario.id, usuario.nivel, usuario.nome)} className="bg-indigo-600 text-white text-xs px-2.5 py-1.5 rounded hover:bg-indigo-700 transition flex-1 min-w-[40px]" title={usuario.nivel === 'membro' ? 'Promover' : 'Promover Admin'}>↑</button>
+                  )}
+                  {usuario.nivel === 'coordenador' && !isCurrentUser && (
+                    <button onClick={() => handleRebaixar(usuario.id, usuario.nome)} className="bg-yellow-600 text-white text-xs px-2.5 py-1.5 rounded hover:bg-yellow-700 transition flex-1 min-w-[40px]" title="Rebaixar">↓</button>
+                  )}
+                  {usuario.nivel !== 'admin' && !isCurrentUser && (
+                    <button onClick={() => handleDeletar(usuario.id, usuario.nome)} className="bg-red-600 text-white text-xs px-2.5 py-1.5 rounded hover:bg-red-700 transition flex-1 min-w-[40px]" title="Deletar">🗑️</button>
+                  )}
+                  {!isCurrentUser && (
+                    <button onClick={() => handleResetSenha(usuario.id, usuario.nome)} className="bg-purple-600 text-white text-xs px-2.5 py-1.5 rounded hover:bg-purple-700 transition flex-1 min-w-[40px]" title="Resetar Senha">🔑</button>
+                  )}
+                  {isCurrentUser && (
+                    <span className="text-xs text-gray-400 w-full text-center">Não pode se modificar</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
