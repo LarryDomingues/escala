@@ -119,16 +119,21 @@ export default function PlaylistPage() {
 
   const formatarData = (data) => format(parseISO(data), 'dd/MM/yyyy');
 
+  // CORREÇÃO: Verifica se o usuário está escalado como voz1 OU voz2
   const isUsuarioEscalado = (escala) => {
     if (!usuarioInfo?.membro_id) return false;
+    // Inclui todos os campos de instrumentos
     const campos = ['voz_id', 'voz2_id', 'violao_id', 'guitarra_id', 'baixo_id', 'bateria_id', 'teclado_id'];
     return campos.some(campo => escala[campo] && escala[campo] === usuarioInfo.membro_id);
   };
 
+  // Verifica se o usuário pode editar (admin ou está escalado)
   const podeEditar = (escala) => {
     if (user?.nivel === 'admin') return true;
-    if (user?.nivel === 'coordenador' && isUsuarioEscalado(escala)) return true;
-    if (user?.nivel === 'membro' && isUsuarioEscalado(escala)) return true;
+    // Coordenador e membro podem editar se estiverem escalados (voz1 ou voz2)
+    if ((user?.nivel === 'coordenador' || user?.nivel === 'membro') && isUsuarioEscalado(escala)) {
+      return true;
+    }
     return false;
   };
 
@@ -162,18 +167,20 @@ export default function PlaylistPage() {
             <div>
               <p className="font-medium text-green-800 text-sm md:text-base">
                 {user?.nivel === 'admin' 
-                  ? 'Modo Administrador: Você está vendo todas as datas e pode gerenciar todos os links.'
-                  : `Modo Membro: Você está vendo apenas as datas em que está escalado.`
+                  ? 'Modo Administrador: Você está vendo todas as datas e pode gerenciar todos os links e anotações.'
+                  : `Modo Membro: Você está vendo apenas as datas em que está escalado (voz1 ou voz2).`
                 }
               </p>
               {user?.nivel !== 'admin' && (
-                <p className="text-xs md:text-sm text-green-700 mt-1">🔑 Você pode adicionar ou remover links das datas em que está escalado.</p>
+                <p className="text-xs md:text-sm text-green-700 mt-1">
+                  🔑 Você pode adicionar ou remover links e anotações das datas em que está escalado.
+                </p>
               )}
             </div>
           </div>
         </div>
 
-        {/* Filtro de Mês - SEM BOTÃO CARREGAR */}
+        {/* Filtro de Mês */}
         <div className="bg-white rounded-lg shadow-sm p-4 mb-4 md:mb-6">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[200px]">
@@ -223,14 +230,17 @@ export default function PlaylistPage() {
                       </div>
                       <div className="text-indigo-600 text-xs md:text-sm">{escala.dia_semana}</div>
                       <div className="text-xs md:text-sm text-gray-600 mt-1">
+                        {/* Mostra todos os instrumentos com destaque para o usuário */}
                         {['voz', 'voz2', 'violao', 'guitarra', 'baixo', 'bateria', 'teclado'].map((inst, i, arr) => {
                           const nome = escala[`${inst}_nome`];
                           if (!nome) return null;
                           const id = escala[`${inst}_id`];
+                          const isUser = id === usuarioInfo?.membro_id;
                           return (
                             <span key={inst}>
-                              {inst.charAt(0).toUpperCase() + inst.slice(1)}: <strong className={id === usuarioInfo?.membro_id ? 'text-green-600' : ''}>
-                                {id === usuarioInfo?.membro_id ? '⭐ ' : ''}{nome}{id === usuarioInfo?.membro_id && ' (Você)'}
+                              {inst === 'voz' ? 'Voz 1' : inst === 'voz2' ? 'Voz 2' : inst.charAt(0).toUpperCase() + inst.slice(1)}: 
+                              <strong className={isUser ? 'text-green-600' : ''}>
+                                {isUser && '⭐ '}{nome}{isUser && ' (Você)'}
                               </strong>
                               {i < arr.length - 1 && ' | '}
                             </span>
@@ -253,7 +263,14 @@ export default function PlaylistPage() {
                       ) : (
                         podeEditarLink ? (
                           <div className="flex flex-1 min-w-[180px] gap-2 flex-wrap">
-                            <input type="text" value={editando === escala.data ? linkYoutube : ''} onChange={(e) => setLinkYoutube(e.target.value)} onFocus={() => setEditando(escala.data)} placeholder="Cole o link do YouTube..." className="flex-1 min-w-[120px] px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-xs md:text-sm" />
+                            <input 
+                              type="text" 
+                              value={editando === escala.data ? linkYoutube : ''} 
+                              onChange={(e) => setLinkYoutube(e.target.value)} 
+                              onFocus={() => setEditando(escala.data)} 
+                              placeholder="Cole o link do YouTube..." 
+                              className="flex-1 min-w-[120px] px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-xs md:text-sm" 
+                            />
                             <button onClick={() => handleSalvarLink(escala.data)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-xs md:text-sm">➕ Adicionar</button>
                           </div>
                         ) : (
