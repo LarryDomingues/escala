@@ -61,7 +61,7 @@ export default function Login() {
       <Head>
         <title>Login - Escala de Louvor</title>
       </Head>
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-black p-4">
         <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-md">
           <div className="text-center mb-6">
             <div className="flex justify-center mb-2">
