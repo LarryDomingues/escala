@@ -297,7 +297,7 @@ export default function CriarEscala() {
       console.warn('Erro ao carregar logo:', error);
       // Se a logo não carregar, mostra um texto alternativo
       doc.setFontSize(20);
-      doc.setTextColor('#1F2937');
+      doc.setTextColor('#000000');
       doc.text('MINISTÉRIO DE LOUVOR', pageWidth / 2, 25, { align: 'center' });
       logoY = 35;
     }

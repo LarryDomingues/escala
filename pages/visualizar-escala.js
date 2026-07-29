@@ -4,6 +4,8 @@ import Layout from '../components/Layout';
 import axios from 'axios';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function VisualizarEscala() {
   const router = useRouter();
@@ -14,7 +16,8 @@ export default function VisualizarEscala() {
   const [mesSelecionado, setMesSelecionado] = useState(format(new Date(), 'yyyy-MM'));
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
-  const [anotacaoModal, setAnotacaoModal] = useState(null); // { data, anotacao }
+  const [anotacaoModal, setAnotacaoModal] = useState(null);
+  const [gerandoPDF, setGerandoPDF] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -92,8 +95,6 @@ export default function VisualizarEscala() {
     return <span className="membro-nome">{nome}</span>;
   };
 
-  const handleImprimir = () => window.print();
-
   // Nome do mês em português
   const nomeMes = format(new Date(mesSelecionado + '-01'), 'MMMM', { locale: ptBR });
   const anoMes = format(new Date(mesSelecionado + '-01'), 'yyyy');
@@ -106,6 +107,163 @@ export default function VisualizarEscala() {
   // Fechar modal
   const fecharAnotacao = () => {
     setAnotacaoModal(null);
+  };
+
+  // ====== FUNÇÃO PARA GERAR PDF ======
+  const handleGerarPDF = async () => {
+    setGerandoPDF(true);
+
+    try {
+      // Criar documento em paisagem
+      const doc = new jsPDF('landscape', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.getWidth();
+      
+      // ====== CARREGAR E INSERIR A LOGO ======
+      let logoLoaded = false;
+      
+      try {
+        const imageUrl = '/logo.png';
+        
+        const getImageBase64 = (url) => {
+          return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.width;
+              canvas.height = img.height;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0);
+              resolve(canvas.toDataURL('image/png'));
+            };
+            img.onerror = () => reject(new Error('Erro ao carregar imagem'));
+            img.src = url;
+          });
+        };
+        
+        const imgBase64 = await getImageBase64(imageUrl);
+        
+        const logoWidth = 120;
+        const logoHeight = 30;
+        const xPos = (pageWidth - logoWidth) / 2;
+        
+        doc.addImage(imgBase64, 'PNG', xPos, 10, logoWidth, logoHeight);
+        logoLoaded = true;
+        
+      } catch (error) {
+        console.warn('Erro ao carregar logo:', error);
+        // Fallback: texto alternativo
+        doc.setFontSize(20);
+        doc.setTextColor('#000000');
+        doc.text('MINISTÉRIO DE LOUVOR', pageWidth / 2, 25, { align: 'center' });
+      }
+      
+      // ====== MÊS/ANO ======
+      const mesAno = `${nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1)} / ${anoMes}`;
+      
+      const mesY = logoLoaded ? 48 : 33;
+      doc.setFontSize(14);
+      doc.setTextColor('#000000');
+      doc.text(mesAno, pageWidth / 2, mesY, { align: 'center' });
+      
+      // ====== LINHA SEPARADORA ======
+      const lineY = logoLoaded ? 53 : 38;
+      doc.setDrawColor('#000000');
+      doc.setLineWidth(0.5);
+      doc.line(20, lineY, pageWidth - 20, lineY);
+      
+      // ====== PREPARAR DADOS DA TABELA ======
+      const tableData = [];
+      let temDados = false;
+      
+      escalas.forEach((e) => {
+        // Verificar se tem pelo menos um membro escalado
+        const temMembro = e.voz_id || e.voz2_id || e.violao_id || e.guitarra_id || e.baixo_id || e.bateria_id || e.teclado_id;
+        
+        if (temMembro) {
+          temDados = true;
+          const row = [
+            formatarData(e.data),
+            e.dia_semana,
+            e.voz_nome || '--',
+            e.voz2_nome || '--',
+            e.violao_nome || '--',
+            e.guitarra_nome || '--',
+            e.baixo_nome || '--',
+            e.bateria_nome || '--',
+            e.teclado_nome || '--'
+          ];
+          tableData.push(row);
+        }
+      });
+      
+      if (!temDados) {
+        tableData.push(['Nenhum membro escalado para este mês']);
+      }
+      
+      // ====== CONFIGURAR CABEÇALHO ======
+      const headers = ['Data', 'Dia', 'Voz 1', 'Voz 2', 'Violão', 'Guitarra', 'Baixo', 'Bateria', 'Teclado'];
+      
+      // ====== CRIAR TABELA ======
+      const startY = logoLoaded ? 60 : 45;
+      autoTable(doc, {
+        head: [headers],
+        body: tableData,
+        startY: startY,
+        theme: 'grid',
+        headStyles: {
+          fillColor: '#000000',
+          textColor: '#FFFFFF',
+          fontSize: 9,
+          fontStyle: 'bold',
+          halign: 'center',
+          valign: 'middle',
+          lineWidth: 0.5,
+          lineColor: '#1F2937',
+        },
+        bodyStyles: {
+          fontSize: 9,
+          halign: 'center',
+          valign: 'middle',
+          lineWidth: 0.5,
+          lineColor: '#D1D5DB',
+        },
+        alternateRowStyles: {
+          fillColor: '#F9FAFB',
+        },
+        columnStyles: {
+          0: { cellWidth: 28, fontStyle: 'bold' },
+          1: { cellWidth: 32, textColor: '#000000', fontStyle: 'bold' },
+        },
+        margin: { left: 15, right: 15 },
+        tableWidth: 'auto',
+        styles: {
+          overflow: 'linebreak',
+          cellPadding: 2,
+        },
+        didDrawPage: function(data) {
+          const pageSize = doc.internal.pageSize;
+          const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
+          
+          doc.setFontSize(8);
+          doc.setTextColor('#9CA3AF');
+          doc.text(
+            `Escala gerada automaticamente em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`,
+            doc.internal.pageSize.getWidth() / 2,
+            pageHeight - 10,
+            { align: 'center' }
+          );
+        }
+      });
+      
+      // ====== SALVAR PDF ======
+      doc.save(`Escala_Louvor_${mesAno.replace('/', '_')}.pdf`);
+      
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      alert('Erro ao gerar PDF: ' + error.message);
+    } finally {
+      setGerandoPDF(false);
+    }
   };
 
   if (loading) {
@@ -173,7 +331,7 @@ export default function VisualizarEscala() {
           <span className="text-sm text-yellow-800 ml-2">📝 <strong>Anotações:</strong> Clique no ícone 📝 para ver observações sobre os louvores</span>
         </div>
 
-        {/* Filtro de Mês - SEM BOTÃO VISUALIZAR */}
+        {/* Filtro de Mês - COM BOTÃO PDF */}
         <div className="bg-white rounded-lg shadow-sm p-4 mb-4 md:mb-6">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[200px]">
@@ -185,7 +343,13 @@ export default function VisualizarEscala() {
                 className="input-field"
               />
             </div>
-            <button onClick={handleImprimir} className="btn-purple">🖨️ Imprimir</button>
+            <button 
+              onClick={handleGerarPDF} 
+              disabled={gerandoPDF}
+              className="btn-purple"
+            >
+              {gerandoPDF ? 'Gerando PDF...' : '📋 Escala Grupo'}
+            </button>
           </div>
         </div>
 
@@ -441,52 +605,6 @@ export default function VisualizarEscala() {
         </div>
       )}
 
-      {/* DIV OCULTA PARA IMPRESSÃO - SOMENTE A ESCALA */}
-      <div id="print-content" style={{ display: 'none' }}>
-        <div className="print-header">
-          <h1 style={{ fontSize: '24px', margin: '0', textAlign: 'center' }}>Ministério de Louvor</h1>
-          <p style={{ fontSize: '14px', color: '#666', margin: '5px 0 15px', textAlign: 'center' }}>
-            {nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1)} / {anoMes}
-          </p>
-        </div>
-
-        <table className="print-table">
-          <thead>
-            <tr>
-              <th>Data</th>
-              <th>Dia</th>
-              <th>Voz 1</th>
-              <th>Voz 2</th>
-              <th>Violão</th>
-              <th>Guitarra</th>
-              <th>Baixo</th>
-              <th>Bateria</th>
-              <th>Teclado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {escalas.map((e, i) => (
-              <tr key={i}>
-                <td>{formatarData(e.data)}</td>
-                <td>{e.dia_semana}</td>
-                <td>{e.voz_nome || '--'}</td>
-                <td>{e.voz2_nome || '--'}</td>
-                <td>{e.violao_nome || '--'}</td>
-                <td>{e.guitarra_nome || '--'}</td>
-                <td>{e.baixo_nome || '--'}</td>
-                <td>{e.bateria_nome || '--'}</td>
-                <td>{e.teclado_nome || '--'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div className="print-footer">
-          Gerado em {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}
-        </div>
-      </div>
-
-      {/* Estilos para o destaque pulsante e impressão */}
       <style jsx global>{`
         .membro-destaque {
           display: inline-block;
@@ -528,98 +646,59 @@ export default function VisualizarEscala() {
           background-color: #fffbeb !important;
         }
 
-        /* ESTILOS PARA IMPRESSÃO */
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          
-          #print-content,
-          #print-content * {
-            visibility: visible;
-          }
-          
-          #print-content {
-            display: block !important;
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 100%;
-            padding: 30px 40px;
-            background: white;
-          }
-
-          .print-header h1 {
-            font-size: 24px;
-            text-align: center;
-            margin: 0 0 5px 0;
-            color: #000;
-            font-weight: bold;
-          }
-
-          .print-header p {
-            font-size: 14px;
-            text-align: center;
-            color: #666;
-            margin: 0 0 20px 0;
-          }
-
-          .print-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-          }
-
-          .print-table th {
-            background: #333 !important;
-            color: white !important;
-            padding: 8px 6px;
-            border: 1px solid #333;
-            text-align: center;
-            font-weight: 600;
-          }
-
-          .print-table td {
-            padding: 6px 4px;
-            border: 1px solid #ddd;
-            text-align: center;
-          }
-
-          .print-table tr:nth-child(even) {
-            background: #f9f9f9;
-          }
-
-          .print-footer {
-            text-align: center;
-            margin-top: 20px;
-            padding-top: 10px;
-            border-top: 1px solid #ddd;
-            font-size: 11px;
-            color: #999;
-          }
-
-          .sidebar,
-          .mobile-header,
-          .menu-toggle-btn,
-          .btn-primary,
-          .btn-purple,
-          .filtro-mes,
-          .stats-grid,
-          .legenda-destaque,
-          .info-usuario-destaque,
-          .bg-yellow-50,
-          .hidden.md\\:block,
-          .md\\:hidden {
-            display: none !important;
-          }
-
-          .print-table {
-            display: table !important;
-          }
+        .btn-purple {
+          background: linear-gradient(135deg, #7C3AED, #6D28D9);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          padding: 8px 20px;
+          font-size: 14px;
+          white-space: nowrap;
+        }
+        
+        .btn-purple:hover:not(:disabled) {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+        }
+        
+        .btn-purple:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
         }
 
-        #print-content {
-          display: none !important;
+        .input-field {
+          width: 100%;
+          padding: 8px 12px;
+          border: 1px solid #D1D5DB;
+          border-radius: 8px;
+          font-size: 14px;
+          transition: all 0.2s;
+          background: white;
+        }
+        
+        .input-field:focus {
+          outline: none;
+          border-color: #4F46E5;
+          box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .btn-primary {
+          background: linear-gradient(135deg, #4F46E5, #4338CA);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          padding: 8px 20px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        
+        .btn-primary:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
         }
       `}</style>
     </Layout>
