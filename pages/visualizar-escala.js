@@ -348,7 +348,7 @@ export default function VisualizarEscala() {
               disabled={gerandoPDF}
               className="btn-purple"
             >
-              {gerandoPDF ? 'Gerando PDF...' : '📋 Escala Grupo'}
+              {gerandoPDF ? 'Gerando PDF...' : '📋 Baixar Escala '}
             </button>
           </div>
         </div>
