@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import axios from 'axios';
-import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function CriarEscala() {
   const router = useRouter();
@@ -18,6 +20,7 @@ export default function CriarEscala() {
   const [mensagemTipo, setMensagemTipo] = useState('');
   const [dataAvulsa, setDataAvulsa] = useState('');
   const [diasAvulsos, setDiasAvulsos] = useState([]);
+  const [gerandoPDF, setGerandoPDF] = useState(false);
 
   const HABILIDADES = ['Voz', 'Voz2', 'Violão', 'Guitarra', 'Baixo', 'Bateria', 'Teclado'];
   const CAMPOS_HABILIDADES = {
@@ -75,20 +78,16 @@ export default function CriarEscala() {
       const [ano, mes] = mesSelecionado.split('-').map(Number);
       const diasRegulares = gerarDiasEscala(ano, mes);
       
-      // Carregar dias avulsos salvos
       const diasAvulsosSalvos = await carregarDiasAvulsos(ano, mes);
       
-      // Combinar dias regulares e avulsos
       const todosDias = [...diasRegulares];
       
-      // Adicionar dias avulsos que não estão na lista regular
       diasAvulsosSalvos.forEach(diaAvulso => {
         if (!todosDias.some(d => d.data === diaAvulso.data)) {
           todosDias.push(diaAvulso);
         }
       });
       
-      // Ordenar por data
       todosDias.sort((a, b) => a.data.localeCompare(b.data));
       
       setDiasEscala(todosDias);
@@ -126,6 +125,11 @@ export default function CriarEscala() {
 
   const getEscalaData = (data) => {
     return escalas.find(e => e.data === data);
+  };
+
+  const getMembroNome = (id) => {
+    const membro = membros.find(m => m.id === id);
+    return membro ? membro.nome : '';
   };
 
   const handleSalvar = async (e) => {
@@ -180,7 +184,6 @@ export default function CriarEscala() {
       return;
     }
 
-    // Verificar se a data já existe na lista
     if (diasEscala.some(d => d.data === dataAvulsa)) {
       setMensagem('Esta data já está na escala');
       setMensagemTipo('error');
@@ -188,7 +191,6 @@ export default function CriarEscala() {
     }
 
     try {
-      // Verificar se a data está no mês selecionado
       const [anoSelecionado, mesSelecionadoNum] = mesSelecionado.split('-').map(Number);
       const [anoAvulso, mesAvulso] = dataAvulsa.split('-').map(Number);
       
@@ -200,7 +202,6 @@ export default function CriarEscala() {
 
       const diaSemana = format(parseISO(dataAvulsa), 'EEEE', { locale: ptBR });
       
-      // Adicionar à lista
       const novoDia = {
         data: dataAvulsa,
         dia_semana: diaSemana,
@@ -211,7 +212,6 @@ export default function CriarEscala() {
       setDiasAvulsos([...diasAvulsos, novoDia]);
       setDataAvulsa('');
       
-      // Salvar no banco como dia avulso
       await axios.post('/api/escala/avulsos', {
         data: dataAvulsa,
         mes: mesSelecionado,
@@ -233,7 +233,6 @@ export default function CriarEscala() {
     try {
       await axios.delete(`/api/escala/avulsos?data=${data}`);
       
-      // Remover da lista
       setDiasEscala(diasEscala.filter(d => d.data !== data));
       setDiasAvulsos(diasAvulsos.filter(d => d.data !== data));
       
@@ -246,15 +245,192 @@ export default function CriarEscala() {
     }
   };
 
-  const handleImprimir = () => {
-    window.print();
-  };
+  const handleGerarPDF = async () => {  // Adicione 'async' aqui
+  setGerandoPDF(true);
+
+  try {
+    // Criar documento em paisagem
+    const doc = new jsPDF('landscape', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // ====== CARREGAR E INSERIR A LOGO ======
+    let logoLoaded = false;
+    let logoY = 15; // Posição Y padrão
+    
+    try {
+      // Carregar a imagem da pasta public
+      const imageUrl = '/logo.png'; // Caminho da imagem na pasta public
+      
+      // Função para converter imagem para base64
+      const getImageBase64 = (url) => {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+          };
+          img.onerror = () => reject(new Error('Erro ao carregar imagem'));
+          img.src = url;
+        });
+      };
+      
+      const imgBase64 = await getImageBase64(imageUrl);
+      
+      // Definir tamanho da logo (ajuste conforme necessário)
+      const logoWidth = 120; // Largura em mm
+      const logoHeight = 30; // Altura em mm
+      const xPos = (pageWidth - logoWidth) / 2; // Centralizar
+      
+      // Adicionar a logo ao PDF
+      doc.addImage(imgBase64, 'PNG', xPos, 10, logoWidth, logoHeight);
+      
+      logoLoaded = true;
+      logoY = 45; // Ajustar posição Y para os próximos elementos
+      
+      console.log('Logo carregada com sucesso!');
+      
+    } catch (error) {
+      console.warn('Erro ao carregar logo:', error);
+      // Se a logo não carregar, mostra um texto alternativo
+      doc.setFontSize(20);
+      doc.setTextColor('#1F2937');
+      doc.text('MINISTÉRIO DE LOUVOR', pageWidth / 2, 25, { align: 'center' });
+      logoY = 35;
+    }
+    
+    // ====== MÊS/ANO ======
+    const mesNome = format(parseISO(`${mesSelecionado}-01`), 'MMMM', { locale: ptBR });
+    const anoNome = format(parseISO(`${mesSelecionado}-01`), 'yyyy');
+    const mesAno = `${mesNome.charAt(0).toUpperCase() + mesNome.slice(1)} / ${anoNome}`;
+    
+    // Posicionar o mês/ano abaixo da logo
+    const mesY = logoLoaded ? 48 : 33;
+    doc.setFontSize(14);
+    doc.setTextColor('#000000');
+    doc.text(mesAno, pageWidth / 2, mesY, { align: 'center' });
+    
+    // ====== LINHA SEPARADORA ======
+    const lineY = logoLoaded ? 53 : 38;
+    doc.setDrawColor('#000000');
+    doc.setLineWidth(0.5);
+    doc.line(20, lineY, pageWidth - 20, lineY);
+    
+    // ====== PREPARAR DADOS DA TABELA ======
+    const tableData = [];
+    let temDados = false;
+    
+    diasEscala.forEach((dia) => {
+      const escalaData = getEscalaData(dia.data);
+      
+      let temMembro = false;
+      if (escalaData) {
+        for (const campo of Object.keys(CAMPOS_HABILIDADES)) {
+          if (escalaData[campo]) {
+            temMembro = true;
+            break;
+          }
+        }
+      }
+      
+      if (temMembro) {
+        temDados = true;
+        const dataFormatada = format(parseISO(dia.data), 'dd/MM/yyyy');
+        const diaSemana = dia.dia_semana.charAt(0).toUpperCase() + dia.dia_semana.slice(1);
+        
+        const row = [dataFormatada, diaSemana];
+        
+        Object.entries(CAMPOS_HABILIDADES).forEach(([campo]) => {
+          const membroId = escalaData ? escalaData[campo] : null;
+          const nome = membroId ? getMembroNome(membroId) : '--';
+          row.push(nome);
+        });
+        
+        tableData.push(row);
+      }
+    });
+    
+    if (!temDados) {
+      tableData.push(['Nenhum membro escalado para este mês']);
+    }
+    
+    // ====== CONFIGURAR CABEÇALHO ======
+    const headers = ['Data', 'Dia', ...Object.values(CAMPOS_HABILIDADES)];
+    
+    // ====== CRIAR TABELA ======
+    const startY = logoLoaded ? 60 : 45;
+    autoTable(doc, {
+      head: [headers],
+      body: tableData,
+      startY: startY,
+      theme: 'grid',
+      headStyles: {
+        fillColor: '#0e0e0e',
+        textColor: '#FFFFFF',
+        fontSize: 9,
+        fontStyle: 'bold',
+        halign: 'center',
+        valign: 'middle',
+        lineWidth: 0.5,
+        lineColor: '#1F2937',
+      },
+      bodyStyles: {
+        fontSize: 9,
+        halign: 'center',
+        valign: 'middle',
+        lineWidth: 0.5,
+        lineColor: '#D1D5DB',
+        textColor: '#050505',
+      },
+      alternateRowStyles: {
+        fillColor: '#F9FAFB',
+      },
+      columnStyles: {
+        0: { cellWidth: 28, fontStyle: 'bold' },
+        1: { cellWidth: 32, textColor: '#050505', fontStyle: 'bold' },
+      },
+      margin: { left: 15, right: 15 },
+      tableWidth: 'auto',
+      styles: {
+        overflow: 'linebreak',
+        cellPadding: 2,
+      },
+      didDrawPage: function(data) {
+        const pageSize = doc.internal.pageSize;
+        const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
+        
+        doc.setFontSize(8);
+        doc.setTextColor('#9CA3AF');
+        doc.text(
+          `Escala gerada automaticamente em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`,
+          doc.internal.pageSize.getWidth() / 2,
+          pageHeight - 10,
+          { align: 'center' }
+        );
+      }
+    });
+    
+    // ====== SALVAR PDF ======
+    doc.save(`Escala_Louvor_${mesAno.replace('/', '_')}.pdf`);
+    
+    setMensagem('PDF gerado com sucesso!');
+    setMensagemTipo('success');
+  } catch (error) {
+    console.error('Erro ao gerar PDF:', error);
+    setMensagem('Erro ao gerar PDF: ' + error.message);
+    setMensagemTipo('error');
+  } finally {
+    setGerandoPDF(false);
+  }
+};
 
   const getMembrosByHabilidade = (habilidade) => {
     return membrosPorHabilidade[habilidade] || [];
   };
 
-  // Verificar se uma data é avulsa
   const isDataAvulsa = (data) => {
     return diasAvulsos.some(d => d.data === data);
   };
@@ -428,10 +604,11 @@ export default function CriarEscala() {
               </button>
               <button
                 type="button"
-                onClick={handleImprimir}
+                onClick={handleGerarPDF}
+                disabled={gerandoPDF}
                 className="btn-purple px-6 py-2 text-sm md:text-base"
               >
-                📋 Escala Grupo
+                {gerandoPDF ? 'Gerando PDF...' : '📋 Escala Grupo'}
               </button>
             </div>
           </form>
@@ -439,6 +616,80 @@ export default function CriarEscala() {
       </div>
 
       <style jsx global>{`
+        .btn-purple {
+          background: linear-gradient(135deg, #7C3AED, #6D28D9);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          padding: 8px 20px;
+        }
+        
+        .btn-purple:hover:not(:disabled) {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+        }
+        
+        .btn-purple:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        
+        .input-field {
+          width: 100%;
+          padding: 8px 12px;
+          border: 1px solid #D1D5DB;
+          border-radius: 8px;
+          font-size: 14px;
+          transition: all 0.2s;
+          background: white;
+        }
+        
+        .input-field:focus {
+          outline: none;
+          border-color: #4F46E5;
+          box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        
+        .btn-primary {
+          background: linear-gradient(135deg, #4F46E5, #4338CA);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          padding: 8px 20px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        
+        .btn-primary:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+        }
+        
+        .btn-success {
+          background: linear-gradient(135deg, #10B981, #059669);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          padding: 8px 20px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        
+        .btn-success:hover:not(:disabled) {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+        
+        .btn-success:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        
         @media print {
           body * { visibility: hidden; }
           .main-content, .main-content * { visibility: visible; }
