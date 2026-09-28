@@ -186,12 +186,7 @@ export default function Dashboard() {
                 <p className="font-semibold">{membroLogado.nome}</p>
               </div>
             </div>
-            {eventosEscalados > 0 && (
-              <div className="text-right">
-                <p className="text-2xl font-bold">{eventosEscalados}</p>
-                <p className="text-xs text-slate-400">eventos este mês</p>
-              </div>
-            )}
+           
           </div>
         </div>
       ) : (
