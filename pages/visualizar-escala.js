@@ -4,8 +4,6 @@ import Layout from '../components/Layout';
 import axios from 'axios';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 export default function VisualizarEscala() {
   const router = useRouter();
@@ -17,7 +15,6 @@ export default function VisualizarEscala() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [anotacaoModal, setAnotacaoModal] = useState(null);
-  const [gerandoPDF, setGerandoPDF] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -88,189 +85,34 @@ export default function VisualizarEscala() {
     if (isUsuarioLogado(membroId)) {
       return (
         <span className="membro-destaque">
-          ⭐ {nome} <span className="badge-eu">(EU)</span>
+          ⭐ {nome}
         </span>
       );
     }
     return <span className="membro-nome">{nome}</span>;
   };
 
-  // Nome do mês em português
+  const handleImprimir = () => window.print();
+
   const nomeMes = format(new Date(mesSelecionado + '-01'), 'MMMM', { locale: ptBR });
   const anoMes = format(new Date(mesSelecionado + '-01'), 'yyyy');
 
-  // Abrir modal de anotação
   const abrirAnotacao = (data, anotacao) => {
     setAnotacaoModal({ data, anotacao });
   };
 
-  // Fechar modal
   const fecharAnotacao = () => {
     setAnotacaoModal(null);
-  };
-
-  // ====== FUNÇÃO PARA GERAR PDF ======
-  const handleGerarPDF = async () => {
-    setGerandoPDF(true);
-
-    try {
-      // Criar documento em paisagem
-      const doc = new jsPDF('landscape', 'mm', 'a4');
-      const pageWidth = doc.internal.pageSize.getWidth();
-      
-      // ====== CARREGAR E INSERIR A LOGO ======
-      let logoLoaded = false;
-      
-      try {
-        const imageUrl = '/logo.png';
-        
-        const getImageBase64 = (url) => {
-          return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => {
-              const canvas = document.createElement('canvas');
-              canvas.width = img.width;
-              canvas.height = img.height;
-              const ctx = canvas.getContext('2d');
-              ctx.drawImage(img, 0, 0);
-              resolve(canvas.toDataURL('image/png'));
-            };
-            img.onerror = () => reject(new Error('Erro ao carregar imagem'));
-            img.src = url;
-          });
-        };
-        
-        const imgBase64 = await getImageBase64(imageUrl);
-        
-        const logoWidth = 120;
-        const logoHeight = 30;
-        const xPos = (pageWidth - logoWidth) / 2;
-        
-        doc.addImage(imgBase64, 'PNG', xPos, 10, logoWidth, logoHeight);
-        logoLoaded = true;
-        
-      } catch (error) {
-        console.warn('Erro ao carregar logo:', error);
-        // Fallback: texto alternativo
-        doc.setFontSize(20);
-        doc.setTextColor('#000000');
-        doc.text('MINISTÉRIO DE LOUVOR', pageWidth / 2, 25, { align: 'center' });
-      }
-      
-      // ====== MÊS/ANO ======
-      const mesAno = `${nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1)} / ${anoMes}`;
-      
-      const mesY = logoLoaded ? 48 : 33;
-      doc.setFontSize(14);
-      doc.setTextColor('#000000');
-      doc.text(mesAno, pageWidth / 2, mesY, { align: 'center' });
-      
-      // ====== LINHA SEPARADORA ======
-      const lineY = logoLoaded ? 53 : 38;
-      doc.setDrawColor('#000000');
-      doc.setLineWidth(0.5);
-      doc.line(20, lineY, pageWidth - 20, lineY);
-      
-      // ====== PREPARAR DADOS DA TABELA ======
-      const tableData = [];
-      let temDados = false;
-      
-      escalas.forEach((e) => {
-        // Verificar se tem pelo menos um membro escalado
-        const temMembro = e.voz_id || e.voz2_id || e.violao_id || e.guitarra_id || e.baixo_id || e.bateria_id || e.teclado_id;
-        
-        if (temMembro) {
-          temDados = true;
-          const row = [
-            formatarData(e.data),
-            e.dia_semana,
-            e.voz_nome || '--',
-            e.voz2_nome || '--',
-            e.violao_nome || '--',
-            e.guitarra_nome || '--',
-            e.baixo_nome || '--',
-            e.bateria_nome || '--',
-            e.teclado_nome || '--'
-          ];
-          tableData.push(row);
-        }
-      });
-      
-      if (!temDados) {
-        tableData.push(['Nenhum membro escalado para este mês']);
-      }
-      
-      // ====== CONFIGURAR CABEÇALHO ======
-      const headers = ['Data', 'Dia', 'Voz 1', 'Voz 2', 'Violão', 'Guitarra', 'Baixo', 'Bateria', 'Teclado'];
-      
-      // ====== CRIAR TABELA ======
-      const startY = logoLoaded ? 60 : 45;
-      autoTable(doc, {
-        head: [headers],
-        body: tableData,
-        startY: startY,
-        theme: 'grid',
-        headStyles: {
-          fillColor: '#000000',
-          textColor: '#FFFFFF',
-          fontSize: 9,
-          fontStyle: 'bold',
-          halign: 'center',
-          valign: 'middle',
-          lineWidth: 0.5,
-          lineColor: '#1F2937',
-        },
-        bodyStyles: {
-          fontSize: 9,
-          halign: 'center',
-          valign: 'middle',
-          lineWidth: 0.5,
-          lineColor: '#D1D5DB',
-        },
-        alternateRowStyles: {
-          fillColor: '#F9FAFB',
-        },
-        columnStyles: {
-          0: { cellWidth: 28, fontStyle: 'bold' },
-          1: { cellWidth: 32, textColor: '#000000', fontStyle: 'bold' },
-        },
-        margin: { left: 15, right: 15 },
-        tableWidth: 'auto',
-        styles: {
-          overflow: 'linebreak',
-          cellPadding: 2,
-        },
-        didDrawPage: function(data) {
-          const pageSize = doc.internal.pageSize;
-          const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
-          
-          doc.setFontSize(8);
-          doc.setTextColor('#9CA3AF');
-          doc.text(
-            `Escala gerada automaticamente em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`,
-            doc.internal.pageSize.getWidth() / 2,
-            pageHeight - 10,
-            { align: 'center' }
-          );
-        }
-      });
-      
-      // ====== SALVAR PDF ======
-      doc.save(`Escala_Louvor_${mesAno.replace('/', '_')}.pdf`);
-      
-    } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
-      alert('Erro ao gerar PDF: ' + error.message);
-    } finally {
-      setGerandoPDF(false);
-    }
   };
 
   if (loading) {
     return (
       <Layout>
-        <div className="flex justify-center items-center h-64">
-          <div className="text-gray-500">Carregando...</div>
+        <div className="flex items-center justify-center h-96">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-slate-200 dark:border-slate-800 border-t-slate-900 dark:border-t-white rounded-full animate-spin"></div>
+            <p className="text-sm text-slate-400 dark:text-slate-500">Carregando</p>
+          </div>
         </div>
       </Layout>
     );
@@ -279,9 +121,9 @@ export default function VisualizarEscala() {
   if (error) {
     return (
       <Layout>
-        <div className="p-4 bg-red-50 text-red-600 rounded-lg">
-          <p>{error}</p>
-          <button onClick={loadEscalas} className="mt-2 btn-primary">Tentar novamente</button>
+        <div className="p-6 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/40 rounded-2xl">
+          <p className="text-sm text-red-700 dark:text-red-400 mb-3">{error}</p>
+          <button onClick={loadEscalas} className="btn-primary">Tentar novamente</button>
         </div>
       </Layout>
     );
@@ -289,416 +131,495 @@ export default function VisualizarEscala() {
 
   return (
     <Layout>
-      <div className="p-3 md:p-4 max-w-7xl mx-auto">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-800 mb-4 md:mb-6">📅 Visualizar Escalas</h1>
+      {/* Header */}
+      <div className="mb-8">
+        <p className="text-sm text-slate-400 dark:text-slate-500 mb-1">
+          {nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1)} de {anoMes}
+        </p>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 dark:text-white">
+            Escalas do Ministério
+          </h1>
+          <button onClick={handleImprimir} className="btn-secondary">
+            <span>⎙</span>
+            <span className="hidden sm:inline">Imprimir</span>
+          </button>
+        </div>
+      </div>
 
-        {/* Informação do Usuário Logado - Visível apenas em Desktop */}
-        <div className="hidden md:block">
-          {membroLogado ? (
-            <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-3 md:p-4 rounded-lg mb-4 md:mb-6 border-l-4 border-orange-400">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-2xl">⭐</span>
-                <div>
-                  <p className="font-medium text-orange-800 text-sm md:text-base">
-                    Você está destacado na escala como <strong>{membroLogado.nome}</strong>
-                    {user?.nivel === 'admin' && <span className="ml-2 text-xs text-gray-500">(Administrador)</span>}
-                    {user?.nivel === 'coordenador' && <span className="ml-2 text-xs text-gray-500">(Coordenador)</span>}
-                  </p>
-                </div>
+      {/* Info do membro logado - Desktop */}
+      <div className="hidden md:block mb-6">
+        {membroLogado ? (
+          <div className="p-4 bg-slate-900 dark:bg-slate-800 rounded-2xl text-white flex items-center justify-between flex-wrap gap-3 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-lg">⭐</span>
+              </div>
+              <div>
+                <p className="text-sm text-slate-300">Você está escalado como</p>
+                <p className="font-semibold">{membroLogado.nome}</p>
               </div>
             </div>
-          ) : (
-            <div className="bg-gray-50 p-3 md:p-4 rounded-lg mb-4 md:mb-6 border-l-4 border-gray-400">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-2xl">ℹ️</span>
-                <div>
-                  <p className="text-gray-600 text-sm md:text-base">
-                    Você não está vinculado a nenhum membro. Peça ao administrador para vincular seu usuário a um membro.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Legenda - Visível apenas em Desktop */}
-        <div className="hidden md:block bg-yellow-50 p-3 md:p-4 rounded-lg mb-4 md:mb-6 border border-yellow-200 flex items-center gap-3 flex-wrap">
-          <span className="font-medium text-yellow-800">📌 Legenda:</span>
-          <span className="inline-block bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold animate-pulse">
-            ⭐ Nome do Membro <span className="bg-white/30 px-1.5 py-0.5 rounded text-xs">(EU)</span>
-          </span>
-          <span className="text-sm text-yellow-800">→ Seu nome aparece destacado em <strong>laranja</strong> com efeito <strong>pulsante</strong></span>
-          <span className="text-sm text-yellow-800 ml-2">📝 <strong>Anotações:</strong> Clique no ícone 📝 para ver observações sobre os louvores</span>
-        </div>
-
-        {/* Filtro de Mês - COM BOTÃO PDF */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-4 md:mb-6">
-          <div className="flex flex-wrap gap-4 items-end">
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-gray-700 mb-1">📅 Selecione o Mês</label>
-              <input
-                type="month"
-                value={mesSelecionado}
-                onChange={(e) => setMesSelecionado(e.target.value)}
-                className="input-field"
-              />
-            </div>
-            <button 
-              onClick={handleGerarPDF} 
-              disabled={gerandoPDF}
-              className="btn-purple"
-            >
-              {gerandoPDF ? 'Gerando PDF...' : '📋 Baixar Escala '}
-            </button>
-          </div>
-        </div>
-
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">
-            <div className="bg-white p-3 md:p-4 rounded-lg shadow-sm text-center">
-              <div className="text-xl md:text-2xl font-bold text-indigo-600">{stats.total}</div>
-              <div className="text-xs md:text-sm text-gray-500">Total de Eventos</div>
-            </div>
-            <div className="bg-white p-3 md:p-4 rounded-lg shadow-sm text-center">
-              <div className="text-xl md:text-2xl font-bold text-green-600">{stats.completos}</div>
-              <div className="text-xs md:text-sm text-gray-500">Eventos Completos</div>
-            </div>
-            <div className="bg-white p-3 md:p-4 rounded-lg shadow-sm text-center">
-              <div className="text-xl md:text-2xl font-bold text-purple-600">{stats.participantes}</div>
-              <div className="text-xs md:text-sm text-gray-500">Participantes Únicos</div>
-            </div>
-            <div className="bg-white p-3 md:p-4 rounded-lg shadow-sm text-center">
-              <div className="text-xl md:text-2xl font-bold text-orange-600">{stats.media}%</div>
-              <div className="text-xs md:text-sm text-gray-500">Taxa de Preenchimento</div>
-            </div>
-          </div>
-        )}
-
-        {escalas.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-            <div className="text-5xl mb-4">📅</div>
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">Nenhuma escala encontrada</h3>
-            <p className="text-gray-500">Não há eventos de escala para este mês.</p>
+            {user?.nivel === 'admin' && (
+              <span className="text-xs bg-white/10 px-3 py-1 rounded-lg">Administrador</span>
+            )}
+            {user?.nivel === 'coordenador' && (
+              <span className="text-xs bg-white/10 px-3 py-1 rounded-lg">Coordenador</span>
+            )}
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            {/* Versão Desktop - Tabela Completa */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-xs md:text-sm">
-                <thead className="bg-indigo-600 text-white">
-                  <tr>
-                    <th className="px-2 md:px-4 py-2 text-center">Data</th>
-                    <th className="px-2 md:px-4 py-2 text-center">Dia</th>
-                    <th className="px-2 md:px-4 py-2 text-center">Voz 1</th>
-                    <th className="px-2 md:px-4 py-2 text-center">Voz 2</th>
-                    <th className="px-2 md:px-4 py-2 text-center">Violão</th>
-                    <th className="px-2 md:px-4 py-2 text-center">Guitarra</th>
-                    <th className="px-2 md:px-4 py-2 text-center">Baixo</th>
-                    <th className="px-2 md:px-4 py-2 text-center">Bateria</th>
-                    <th className="px-2 md:px-4 py-2 text-center">Teclado</th>
-                    <th className="px-2 md:px-4 py-2 text-center">Vídeo</th>
-                    <th className="px-2 md:px-4 py-2 text-center">📝</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {escalas.map((e, i) => {
-                    const estaEscalado = membroLogado && (
-                      e.voz_id === membroLogado.id ||
-                      e.voz2_id === membroLogado.id ||
-                      e.violao_id === membroLogado.id ||
-                      e.guitarra_id === membroLogado.id ||
-                      e.baixo_id === membroLogado.id ||
-                      e.bateria_id === membroLogado.id ||
-                      e.teclado_id === membroLogado.id
-                    );
-                    const temAnotacao = e.anotacao && e.anotacao.trim() !== '';
-                    return (
-                      <tr key={i} className={`hover:bg-gray-50 ${estaEscalado ? 'bg-yellow-50' : ''}`}>
-                        <td className="px-2 md:px-4 py-2 text-center font-medium whitespace-nowrap">{formatarData(e.data)}</td>
-                        <td className="px-2 md:px-4 py-2 text-center text-indigo-600 font-medium whitespace-nowrap">{e.dia_semana}</td>
-                        <td className="px-2 md:px-4 py-2 text-center">
-                          {e.voz_nome ? formatarNomeMembro(e.voz_nome, e.voz_id) : '--'}
-                        </td>
-                        <td className="px-2 md:px-4 py-2 text-center">
-                          {e.voz2_nome ? formatarNomeMembro(e.voz2_nome, e.voz2_id) : '--'}
-                        </td>
-                        <td className="px-2 md:px-4 py-2 text-center">
-                          {e.violao_nome ? formatarNomeMembro(e.violao_nome, e.violao_id) : '--'}
-                        </td>
-                        <td className="px-2 md:px-4 py-2 text-center">
-                          {e.guitarra_nome ? formatarNomeMembro(e.guitarra_nome, e.guitarra_id) : '--'}
-                        </td>
-                        <td className="px-2 md:px-4 py-2 text-center">
-                          {e.baixo_nome ? formatarNomeMembro(e.baixo_nome, e.baixo_id) : '--'}
-                        </td>
-                        <td className="px-2 md:px-4 py-2 text-center">
-                          {e.bateria_nome ? formatarNomeMembro(e.bateria_nome, e.bateria_id) : '--'}
-                        </td>
-                        <td className="px-2 md:px-4 py-2 text-center">
-                          {e.teclado_nome ? formatarNomeMembro(e.teclado_nome, e.teclado_id) : '--'}
-                        </td>
-                        <td className="px-2 md:px-4 py-2 text-center">
-                          {e.link_youtube && (
-                            <a
-                              href={getYouTubeLink(e.link_youtube)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-block px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs md:text-sm"
-                            >
-                              ▶️
-                            </a>
-                          )}
-                        </td>
-                        <td className="px-2 md:px-4 py-2 text-center">
-                          {temAnotacao ? (
-                            <button
-                              onClick={() => abrirAnotacao(e.data, e.anotacao)}
-                              className="text-yellow-600 hover:text-yellow-800 text-lg transition-transform hover:scale-110"
-                              title="Ver anotação"
-                            >
-                              📝
-                            </button>
-                          ) : (
-                            <span className="text-gray-300 text-sm">--</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+          <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/40 rounded-2xl transition-colors">
+            <p className="text-sm text-amber-800 dark:text-amber-400">
+              Você não está vinculado a nenhum membro.
+            </p>
+          </div>
+        )}
+      </div>
 
-            {/* Versão Mobile - Cards */}
-            <div className="md:hidden divide-y divide-gray-200">
-              {escalas.map((e, i) => {
-                const estaEscalado = membroLogado && (
-                  e.voz_id === membroLogado.id ||
-                  e.voz2_id === membroLogado.id ||
-                  e.violao_id === membroLogado.id ||
-                  e.guitarra_id === membroLogado.id ||
-                  e.baixo_id === membroLogado.id ||
-                  e.bateria_id === membroLogado.id ||
-                  e.teclado_id === membroLogado.id
-                );
-                const temAnotacao = e.anotacao && e.anotacao.trim() !== '';
-                return (
-                  <div key={i} className={`p-3 ${estaEscalado ? 'bg-yellow-50 border-l-4 border-orange-400' : ''}`}>
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="font-semibold text-sm">{formatarData(e.data)}</span>
-                      <span className="text-xs text-indigo-600">{e.dia_semana}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1 text-xs mt-1">
-                      <div className="flex items-center gap-1">
-                        <span className="text-gray-500">Voz 1:</span>
-                        <span className="font-medium">
-                          {e.voz_nome ? formatarNomeMembro(e.voz_nome, e.voz_id) : '--'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-gray-500">Voz 2:</span>
-                        <span className="font-medium">
-                          {e.voz2_nome ? formatarNomeMembro(e.voz2_nome, e.voz2_id) : '--'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-gray-500">Violão:</span>
-                        <span className="font-medium">
-                          {e.violao_nome ? formatarNomeMembro(e.violao_nome, e.violao_id) : '--'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-gray-500">Guitarra:</span>
-                        <span className="font-medium">
-                          {e.guitarra_nome ? formatarNomeMembro(e.guitarra_nome, e.guitarra_id) : '--'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-gray-500">Baixo:</span>
-                        <span className="font-medium">
-                          {e.baixo_nome ? formatarNomeMembro(e.baixo_nome, e.baixo_id) : '--'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-gray-500">Bateria:</span>
-                        <span className="font-medium">
-                          {e.bateria_nome ? formatarNomeMembro(e.bateria_nome, e.bateria_id) : '--'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-gray-500">Teclado:</span>
-                        <span className="font-medium">
-                          {e.teclado_nome ? formatarNomeMembro(e.teclado_nome, e.teclado_id) : '--'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 justify-end">
+      {/* Seletor de mês */}
+      <div className="mb-6 p-4 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl transition-colors">
+        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Selecione o mês</label>
+        <input
+          type="month"
+          value={mesSelecionado}
+          onChange={(e) => setMesSelecionado(e.target.value)}
+          className="input-field max-w-xs"
+        />
+      </div>
+
+      {/* Stats */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
+          {[
+            { label: 'Total', value: stats.total },
+            { label: 'Completos', value: stats.completos },
+            { label: 'Membros', value: stats.participantes },
+            { label: 'Preenchido', value: `${stats.media}%` },
+          ].map((item, i) => (
+            <div key={i} className="p-4 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl transition-colors">
+              <div className="text-xs text-slate-400 dark:text-slate-500 mb-1">{item.label}</div>
+              <div className="text-2xl md:text-3xl font-semibold text-slate-900 dark:text-white">{item.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {escalas.length === 0 ? (
+        <div className="text-center py-16 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl transition-colors">
+          <div className="text-4xl mb-3 opacity-40">📅</div>
+          <p className="text-sm text-slate-400 dark:text-slate-500">Nenhuma escala neste mês</p>
+        </div>
+      ) : (
+        <>
+          {/* Versão Desktop - Tabela Completa sem scroll horizontal */}
+          <div className="hidden md:block bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden transition-colors">
+            <table className="w-full table-fixed text-xs">
+              <thead>
+                <tr className="border-b border-slate-200/70 dark:border-slate-800">
+                  <th className="px-1.5 py-3 text-left text-[10px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[9%]">Data</th>
+                  <th className="px-1.5 py-3 text-left text-[10px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[10%]">Dia</th>
+                  <th className="px-1.5 py-3 text-center text-[10px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[11%]">Voz 1</th>
+                  <th className="px-1.5 py-3 text-center text-[10px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[11%]">Voz 2</th>
+                  <th className="px-1.5 py-3 text-center text-[10px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[11%]">Violão</th>
+                  <th className="px-1.5 py-3 text-center text-[10px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[11%]">Guitarra</th>
+                  <th className="px-1.5 py-3 text-center text-[10px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[11%]">Baixo</th>
+                  <th className="px-1.5 py-3 text-center text-[10px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[11%]">Bateria</th>
+                  <th className="px-1.5 py-3 text-center text-[10px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[11%]">Teclado</th>
+                  <th className="px-1 py-3 text-center text-[10px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[7%]">▶</th>
+                  <th className="px-1 py-3 text-center text-[10px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[7%]">📝</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {escalas.map((e, i) => {
+                  const estaEscalado = membroLogado && (
+                    e.voz_id === membroLogado.id ||
+                    e.voz2_id === membroLogado.id ||
+                    e.violao_id === membroLogado.id ||
+                    e.guitarra_id === membroLogado.id ||
+                    e.baixo_id === membroLogado.id ||
+                    e.bateria_id === membroLogado.id ||
+                    e.teclado_id === membroLogado.id
+                  );
+                  const temAnotacao = e.anotacao && e.anotacao.trim() !== '';
+                  return (
+                    <tr key={i} className={`transition-colors ${estaEscalado ? 'bg-slate-50 dark:bg-slate-800/50' : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/30'}`}>
+                      <td className="px-1.5 py-2.5 font-medium text-slate-900 dark:text-white whitespace-nowrap text-[11px]">
+                        {formatarData(e.data)}
+                      </td>
+                      <td className="px-1.5 py-2.5 text-slate-500 dark:text-slate-400 text-[11px] break-words leading-tight">
+                        {e.dia_semana}
+                      </td>
+                      <td className="px-1.5 py-2.5 text-center text-slate-700 dark:text-slate-300 text-[11px] break-words leading-tight">
+                        {e.voz_nome ? formatarNomeMembro(e.voz_nome, e.voz_id) : <span className="text-slate-300 dark:text-slate-600">—</span>}
+                      </td>
+                      <td className="px-1.5 py-2.5 text-center text-slate-700 dark:text-slate-300 text-[11px] break-words leading-tight">
+                        {e.voz2_nome ? formatarNomeMembro(e.voz2_nome, e.voz2_id) : <span className="text-slate-300 dark:text-slate-600">—</span>}
+                      </td>
+                      <td className="px-1.5 py-2.5 text-center text-slate-700 dark:text-slate-300 text-[11px] break-words leading-tight">
+                        {e.violao_nome ? formatarNomeMembro(e.violao_nome, e.violao_id) : <span className="text-slate-300 dark:text-slate-600">—</span>}
+                      </td>
+                      <td className="px-1.5 py-2.5 text-center text-slate-700 dark:text-slate-300 text-[11px] break-words leading-tight">
+                        {e.guitarra_nome ? formatarNomeMembro(e.guitarra_nome, e.guitarra_id) : <span className="text-slate-300 dark:text-slate-600">—</span>}
+                      </td>
+                      <td className="px-1.5 py-2.5 text-center text-slate-700 dark:text-slate-300 text-[11px] break-words leading-tight">
+                        {e.baixo_nome ? formatarNomeMembro(e.baixo_nome, e.baixo_id) : <span className="text-slate-300 dark:text-slate-600">—</span>}
+                      </td>
+                      <td className="px-1.5 py-2.5 text-center text-slate-700 dark:text-slate-300 text-[11px] break-words leading-tight">
+                        {e.bateria_nome ? formatarNomeMembro(e.bateria_nome, e.bateria_id) : <span className="text-slate-300 dark:text-slate-600">—</span>}
+                      </td>
+                      <td className="px-1.5 py-2.5 text-center text-slate-700 dark:text-slate-300 text-[11px] break-words leading-tight">
+                        {e.teclado_nome ? formatarNomeMembro(e.teclado_nome, e.teclado_id) : <span className="text-slate-300 dark:text-slate-600">—</span>}
+                      </td>
+                      <td className="px-1 py-2.5 text-center">
                         {e.link_youtube ? (
                           <a
                             href={getYouTubeLink(e.link_youtube)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-block px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                            title="Ver vídeo"
                           >
-                            ▶️ Vídeo
+                            ▶
                           </a>
                         ) : (
-                          <span className="text-gray-300 text-xs">--</span>
+                          <span className="text-slate-200 dark:text-slate-700 text-xs">—</span>
                         )}
-                      </div>
+                      </td>
+                      <td className="px-1 py-2.5 text-center">
+                        {temAnotacao ? (
+                          <button
+                            onClick={() => abrirAnotacao(e.data, e.anotacao)}
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                            title="Ver anotação"
+                          >
+                            📝
+                          </button>
+                        ) : (
+                          <span className="text-slate-200 dark:text-slate-700 text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Versão Mobile - Cards */}
+          <div className="md:hidden space-y-2">
+            {escalas.map((e, i) => {
+              const estaEscalado = membroLogado && (
+                e.voz_id === membroLogado.id ||
+                e.voz2_id === membroLogado.id ||
+                e.violao_id === membroLogado.id ||
+                e.guitarra_id === membroLogado.id ||
+                e.baixo_id === membroLogado.id ||
+                e.bateria_id === membroLogado.id ||
+                e.teclado_id === membroLogado.id
+              );
+              const temAnotacao = e.anotacao && e.anotacao.trim() !== '';
+              return (
+                <div
+                  key={i}
+                  className={`
+                    p-4 bg-white dark:bg-slate-900 border rounded-2xl transition-all
+                    ${estaEscalado 
+                      ? 'border-slate-900 dark:border-white ring-1 ring-slate-900/5 dark:ring-white/10' 
+                      : 'border-slate-200/60 dark:border-slate-800'
+                    }
+                  `}
+                >
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <div className="font-semibold text-slate-900 dark:text-white text-sm">{formatarData(e.data)}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{e.dia_semana}</div>
                     </div>
-                    <div className="flex items-center justify-between mt-2">
-                      {estaEscalado && (
-                        <span className="text-xs text-orange-600 font-medium">⭐ Você está escalado aqui</span>
-                      )}
+                    <div className="flex items-center gap-1">
                       {temAnotacao && (
                         <button
                           onClick={() => abrirAnotacao(e.data, e.anotacao)}
-                          className="text-yellow-600 hover:text-yellow-800 text-sm flex items-center gap-1"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                          title="Ver anotação"
                         >
-                          📝 Anotação
+                          📝
                         </button>
+                      )}
+                      {e.link_youtube && (
+                        <a
+                          href={getYouTubeLink(e.link_youtube)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                          title="Ver vídeo"
+                        >
+                          ▶
+                        </a>
                       )}
                     </div>
                   </div>
-                );
-              })}
-            </div>
+
+                  <div className="space-y-1.5 text-xs">
+                    {[
+                      { label: 'Voz 1', nome: e.voz_nome, id: e.voz_id },
+                      { label: 'Voz 2', nome: e.voz2_nome, id: e.voz2_id },
+                      { label: 'Violão', nome: e.violao_nome, id: e.violao_id },
+                      { label: 'Guitarra', nome: e.guitarra_nome, id: e.guitarra_id },
+                      { label: 'Baixo', nome: e.baixo_nome, id: e.baixo_id },
+                      { label: 'Bateria', nome: e.bateria_nome, id: e.bateria_id },
+                      { label: 'Teclado', nome: e.teclado_nome, id: e.teclado_id },
+                    ].map(({ label, nome, id }) => (
+                      <div key={label} className="flex items-center gap-2">
+                        <span className="text-slate-400 dark:text-slate-500 w-16 flex-shrink-0">{label}</span>
+                        <span className={`font-medium ${id === membroLogado?.id ? 'text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}`}>
+                          {nome ? formatarNomeMembro(nome, id) : <span className="text-slate-300 dark:text-slate-600">—</span>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {estaEscalado && (
+                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                      <span className="text-xs text-slate-900 dark:text-white font-medium">⭐ Você está escalado</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        )}
+        </>
+      )}
+
+      {/* Legenda */}
+      <div className="mt-6 p-4 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl transition-colors">
+        <p className="text-xs font-medium text-slate-900 dark:text-white mb-3">Legenda</p>
+        <div className="flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-2">
+            <span className="membro-destaque-inline">⭐</span>
+            <span>Você está escalado</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>📝</span>
+            <span>Anotações dos louvores</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>▶</span>
+            <span>Vídeo no YouTube</span>
+          </div>
+        </div>
       </div>
 
-      {/* MODAL DE ANOTAÇÃO */}
+      {/* Modal de anotação */}
       {anotacaoModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">
-                📝 Anotação - {formatarData(anotacaoModal.data)}
-              </h3>
+        <div
+          className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={fecharAnotacao}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl max-w-md w-full p-6 max-h-[80vh] overflow-y-auto border border-slate-200/60 dark:border-slate-800 transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white">Anotação</h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{formatarData(anotacaoModal.data)}</p>
+              </div>
               <button
                 onClick={fecharAnotacao}
-                className="text-gray-400 hover:text-gray-600 text-xl"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 ✕
               </button>
             </div>
-            <div className="mb-4">
-              {anotacaoModal.anotacao ? (
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">
-                    {anotacaoModal.anotacao}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-gray-400 text-sm">Nenhuma anotação para esta data.</p>
-              )}
-            </div>
-            <div className="flex justify-end">
-              <button
-                onClick={fecharAnotacao}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
-              >
-                Fechar
-              </button>
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+              <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                {anotacaoModal.anotacao || 'Nenhuma anotação para esta data.'}
+              </p>
             </div>
           </div>
         </div>
       )}
 
+      {/* DIV OCULTA PARA IMPRESSÃO */}
+      <div id="print-content" style={{ display: 'none' }}>
+        <div className="print-header">
+          <h1 style={{ fontSize: '24px', margin: '0', textAlign: 'center' }}>Ministério de Louvor</h1>
+          <p style={{ fontSize: '14px', color: '#666', margin: '5px 0 15px', textAlign: 'center' }}>
+            {nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1)} / {anoMes}
+          </p>
+        </div>
+
+        <table className="print-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Dia</th>
+              <th>Voz 1</th>
+              <th>Voz 2</th>
+              <th>Violão</th>
+              <th>Guitarra</th>
+              <th>Baixo</th>
+              <th>Bateria</th>
+              <th>Teclado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {escalas.map((e, i) => (
+              <tr key={i}>
+                <td>{formatarData(e.data)}</td>
+                <td>{e.dia_semana}</td>
+                <td>{e.voz_nome || '--'}</td>
+                <td>{e.voz2_nome || '--'}</td>
+                <td>{e.violao_nome || '--'}</td>
+                <td>{e.guitarra_nome || '--'}</td>
+                <td>{e.baixo_nome || '--'}</td>
+                <td>{e.bateria_nome || '--'}</td>
+                <td>{e.teclado_nome || '--'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div className="print-footer">
+          Gerado em {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}
+        </div>
+      </div>
+
+      {/* Estilos */}
       <style jsx global>{`
         .membro-destaque {
           display: inline-block;
-          background: linear-gradient(135deg, #f6ad55 0%, #ed8936 100%);
+          background: #0f172a;
           color: white;
-          padding: 2px 10px;
-          border-radius: 20px;
-          font-weight: 700;
-          font-size: 13px;
-          animation: pulse-destaque 2s ease-in-out infinite;
-          box-shadow: 0 2px 10px rgba(237, 137, 54, 0.3);
-          border: 2px solid #dd6b20;
-        }
-        .membro-destaque .badge-eu {
-          background: rgba(255,255,255,0.3);
           padding: 1px 6px;
-          border-radius: 12px;
-          font-size: 9px;
+          border-radius: 5px;
           font-weight: 600;
-          margin-left: 4px;
+          font-size: 10px;
+          animation: pulse-destaque 2s ease-in-out infinite;
+          line-height: 1.4;
+        }
+        .dark .membro-destaque {
+          background: white;
+          color: #0f172a;
+        }
+        .membro-destaque-inline {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 24px;
+          height: 24px;
+          background: #0f172a;
           color: white;
-          text-transform: uppercase;
+          border-radius: 6px;
+          font-size: 11px;
+        }
+        .dark .membro-destaque-inline {
+          background: white;
+          color: #0f172a;
         }
         @keyframes pulse-destaque {
           0% {
             transform: scale(1);
-            box-shadow: 0 2px 10px rgba(237, 137, 54, 0.3);
+            box-shadow: 0 0 0 0 rgba(15, 23, 42, 0.3);
           }
           50% {
             transform: scale(1.05);
-            box-shadow: 0 4px 20px rgba(237, 137, 54, 0.5);
+            box-shadow: 0 0 0 4px rgba(15, 23, 42, 0);
           }
           100% {
             transform: scale(1);
-            box-shadow: 0 2px 10px rgba(237, 137, 54, 0.3);
+            box-shadow: 0 0 0 0 rgba(15, 23, 42, 0);
           }
         }
-        .bg-yellow-50 {
-          background-color: #fffbeb !important;
+
+        /* ESTILOS PARA IMPRESSÃO */
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          
+          #print-content,
+          #print-content * {
+            visibility: visible;
+          }
+          
+          #print-content {
+            display: block !important;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            padding: 30px 40px;
+            background: white;
+          }
+
+          .print-header h1 {
+            font-size: 24px;
+            text-align: center;
+            margin: 0 0 5px 0;
+            color: #000;
+            font-weight: bold;
+          }
+
+          .print-header p {
+            font-size: 14px;
+            text-align: center;
+            color: #666;
+            margin: 0 0 20px 0;
+          }
+
+          .print-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+          }
+
+          .print-table th {
+            background: #333 !important;
+            color: white !important;
+            padding: 8px 6px;
+            border: 1px solid #333;
+            text-align: center;
+            font-weight: 600;
+          }
+
+          .print-table td {
+            padding: 6px 4px;
+            border: 1px solid #ddd;
+            text-align: center;
+          }
+
+          .print-table tr:nth-child(even) {
+            background: #f9f9f9;
+          }
+
+          .print-footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+            font-size: 11px;
+            color: #999;
+          }
+
+          .sidebar,
+          .mobile-header,
+          .menu-toggle-btn,
+          .btn-primary,
+          .btn-secondary,
+          .btn-purple,
+          .hidden.md\\:block,
+          .md\\:hidden {
+            display: none !important;
+          }
+
+          .print-table {
+            display: table !important;
+          }
         }
 
-        .btn-purple {
-          background: linear-gradient(135deg, #7C3AED, #6D28D9);
-          color: white;
-          border: none;
-          border-radius: 8px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-          padding: 8px 20px;
-          font-size: 14px;
-          white-space: nowrap;
-        }
-        
-        .btn-purple:hover:not(:disabled) {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
-        }
-        
-        .btn-purple:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .input-field {
-          width: 100%;
-          padding: 8px 12px;
-          border: 1px solid #D1D5DB;
-          border-radius: 8px;
-          font-size: 14px;
-          transition: all 0.2s;
-          background: white;
-        }
-        
-        .input-field:focus {
-          outline: none;
-          border-color: #4F46E5;
-          box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-        }
-
-        .btn-primary {
-          background: linear-gradient(135deg, #4F46E5, #4338CA);
-          color: white;
-          border: none;
-          border-radius: 8px;
-          font-weight: 600;
-          padding: 8px 20px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        
-        .btn-primary:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+        #print-content {
+          display: none !important;
         }
       `}</style>
     </Layout>

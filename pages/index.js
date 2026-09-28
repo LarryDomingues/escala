@@ -19,10 +19,10 @@ export default function Dashboard() {
   const [totalMembros, setTotalMembros] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState('proximos'); // 'proximos' ou 'mes'
-  const [anotacaoModal, setAnotacaoModal] = useState(null); // { data, anotacao, dia_semana }
+  const [viewMode, setViewMode] = useState('proximos');
+  const [anotacaoModal, setAnotacaoModal] = useState(null);
 
-  const loadData = useCallback(async (currentUser, forceRefresh = false) => {
+  const loadData = useCallback(async (forceRefresh = false) => {
     const now = Date.now();
     if (!forceRefresh && dashboardCache && (now - dashboardCacheTime) < DASHBOARD_CACHE_TTL) {
       const cached = dashboardCache;
@@ -39,31 +39,26 @@ export default function Dashboard() {
 
     try {
       const mesAtual = format(new Date(), 'yyyy-MM');
-      
-      const escalasRes = await axios.get(`/api/escala?mes=${mesAtual}`);
+      const [escalasRes, membrosRes] = await Promise.all([
+        axios.get(`/api/escala?mes=${mesAtual}`),
+        axios.get('/api/membros'),
+      ]);
+
       const escalasData = escalasRes.data;
-      
-      const membrosRes = await axios.get('/api/membros');
       const membrosData = membrosRes.data;
-      
+
       let membro = null;
-      if (currentUser && currentUser.id) {
-        membro = membrosData.find(m => m.usuario_id === currentUser.id) || null;
+      if (user && user.id) {
+        membro = membrosData.find(m => m.usuario_id === user.id) || null;
       }
-      
-      if (currentUser && currentUser.membro) {
-        membro = currentUser.membro;
+      if (user && user.membro) {
+        membro = user.membro;
       }
-      
+
       const hoje = format(new Date(), 'yyyy-MM-dd');
       const proximosData = escalasData.filter(e => e.data >= hoje).slice(0, 10);
 
-      dashboardCache = {
-        escalas: escalasData,
-        proximos: proximosData,
-        totalMembros: membrosData.length,
-        membroLogado: membro,
-      };
+      dashboardCache = { escalas: escalasData, proximos: proximosData, totalMembros: membrosData.length, membroLogado: membro };
       dashboardCacheTime = now;
 
       setEscalas(escalasData);
@@ -76,60 +71,46 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const res = await axios.get('/api/auth/me');
         setUser(res.data);
-        if (res.data && res.data.membro) {
-          setMembroLogado(res.data.membro);
-        }
-        await loadData(res.data);
+        if (res.data && res.data.membro) setMembroLogado(res.data.membro);
+        await loadData();
       } catch (error) {
         router.push('/login');
       }
     };
     checkAuth();
-  }, []);
+  }, [loadData]);
 
   const formatarData = (data) => format(parseISO(data), 'dd/MM/yyyy');
-
   const getYouTubeLink = (link) => {
     if (!link) return null;
     const match = link.match(/(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
     return match ? `https://www.youtube.com/watch?v=${match[1]}` : link;
   };
 
-  // Função para verificar se o membro está escalado
   const isUsuarioEscalado = (escala) => {
     if (!membroLogado) return false;
     const campos = ['voz_id', 'voz2_id', 'violao_id', 'guitarra_id', 'baixo_id', 'bateria_id', 'teclado_id'];
     return campos.some(campo => escala[campo] === membroLogado.id);
   };
 
-  // Função para verificar se é um evento especial (Reunião, Zeladoria, etc.)
   const isEventoEspecial = (escala) => {
     if (!escala) return false;
-    
     const campos = ['voz_nome', 'voz2_nome', 'violao_nome', 'guitarra_nome', 'baixo_nome', 'bateria_nome', 'teclado_nome'];
     const todosVazios = campos.every(campo => !escala[campo]);
-    
     const palavrasChave = ['Reunião', 'Zeladoria', 'Culto', 'Evento', 'Especial'];
-    const temPalavraChave = palavrasChave.some(palavra => 
-      escala.dia_semana?.includes(palavra) || 
-      (escala.voz_nome?.includes(palavra)) ||
-      (escala.violao_nome?.includes(palavra))
-    );
-    
+    const temPalavraChave = palavrasChave.some(p => escala.dia_semana?.includes(p) || escala.voz_nome?.includes(p) || escala.violao_nome?.includes(p));
     return todosVazios || temPalavraChave;
   };
 
-  // Função para obter o instrumento que o usuário está tocando
   const getInstrumentoUsuario = (escala) => {
     if (!membroLogado) return null;
-    
     const instrumentos = {
       voz_id: { icon: '🎤', label: 'Voz' },
       voz2_id: { icon: '🎤', label: 'Back Vocal' },
@@ -139,67 +120,31 @@ export default function Dashboard() {
       bateria_id: { icon: '🥁', label: 'Bateria' },
       teclado_id: { icon: '🎹', label: 'Teclado' }
     };
-    
     for (const [campo, info] of Object.entries(instrumentos)) {
-      if (escala[campo] === membroLogado.id) {
-        return info;
-      }
+      if (escala[campo] === membroLogado.id) return info;
     }
     return null;
   };
 
-  // Função para obter o tipo de evento (Reunião, Zeladoria, etc.)
   const getTipoEvento = (escala) => {
     if (!escala) return null;
-    
-    if (escala.dia_semana?.includes('Reunião') || 
-        escala.voz_nome?.includes('Reunião') ||
-        escala.violao_nome?.includes('Reunião')) {
-      return { icon: '📌', label: 'Reunião' };
-    }
-    
-    if (escala.dia_semana?.includes('Zeladoria') || 
-        escala.voz_nome?.includes('Zeladoria') ||
-        escala.violao_nome?.includes('Zeladoria')) {
-      return { icon: '🧹', label: 'Zeladoria' };
-    }
-    
-    if (escala.dia_semana?.includes('Especial') || 
-        escala.dia_semana?.includes('Evento')) {
-      return { icon: '🎯', label: 'Evento Especial' };
-    }
-    
+    if (escala.dia_semana?.includes('Reunião') || escala.voz_nome?.includes('Reunião') || escala.violao_nome?.includes('Reunião')) return { icon: '📌', label: 'Reunião' };
+    if (escala.dia_semana?.includes('Zeladoria') || escala.voz_nome?.includes('Zeladoria') || escala.violao_nome?.includes('Zeladoria')) return { icon: '🧹', label: 'Zeladoria' };
+    if (escala.dia_semana?.includes('Especial') || escala.dia_semana?.includes('Evento')) return { icon: '🎯', label: 'Evento Especial' };
     return null;
   };
 
-  // Filtrar escalas para exibição
-  const getEscalasParaExibir = () => {
-    if (viewMode === 'proximos') {
-      return proximos;
-    }
-    return escalas;
-  };
-
-  const escalasExibir = getEscalasParaExibir();
-
-  // Número de eventos onde o usuário está escalado
+  const escalasExibir = viewMode === 'proximos' ? proximos : escalas;
   const eventosEscalados = escalas.filter(e => isUsuarioEscalado(e)).length;
-
-  // Abrir modal de anotação
-  const abrirAnotacao = (data, anotacao, diaSemana) => {
-    setAnotacaoModal({ data, anotacao, dia_semana: diaSemana });
-  };
-
-  // Fechar modal
-  const fecharAnotacao = () => {
-    setAnotacaoModal(null);
-  };
 
   if (loading) {
     return (
       <Layout>
-        <div className="flex justify-center items-center h-64">
-          <div className="text-gray-500">Carregando dados...</div>
+        <div className="flex items-center justify-center h-96">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-slate-200 dark:border-slate-800 border-t-slate-900 dark:border-t-white rounded-full animate-spin"></div>
+            <p className="text-sm text-slate-400">Carregando</p>
+          </div>
         </div>
       </Layout>
     );
@@ -208,9 +153,9 @@ export default function Dashboard() {
   if (error) {
     return (
       <Layout>
-        <div className="p-4 bg-red-50 text-red-600 rounded-lg">
-          <p>{error}</p>
-          <button onClick={() => loadData(user, true)} className="mt-2 btn-primary">Tentar novamente</button>
+        <div className="p-6 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/40 rounded-2xl">
+          <p className="text-sm text-red-700 dark:text-red-400 mb-3">{error}</p>
+          <button onClick={() => loadData(true)} className="btn-primary">Tentar novamente</button>
         </div>
       </Layout>
     );
@@ -218,330 +163,249 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="p-3 md:p-4 max-w-7xl mx-auto">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-800 mb-4 md:mb-6">📊 Dashboard</h1>
+      {/* Header */}
+      <div className="mb-8">
+        <p className="text-sm text-slate-400 dark:text-slate-500 mb-1">
+          {format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+        </p>
+        <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 dark:text-white">
+          Olá, {user?.nome?.split(' ')[0] || 'Usuário'} 👋
+        </h1>
+      </div>
 
-        {/* Informação do Usuário Logado */}
-        <div className="mb-4 md:mb-6">
-          {membroLogado ? (
-            <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-3 md:p-4 rounded-lg border-l-4 border-orange-400">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-2xl">⭐</span>
-                <div>
-                  <p className="font-medium text-orange-800 text-sm md:text-base">
-                    Você está destacado na escala como <strong>{membroLogado.nome}</strong>
-                    {user?.nivel === 'admin' && <span className="ml-2 text-xs text-gray-500">(Admin)</span>}
-                    {user?.nivel === 'coordenador' && <span className="ml-2 text-xs text-gray-500">(Coord)</span>}
-                  </p>
-                  {eventosEscalados > 0 && (
-                    <p className="text-xs text-orange-600 mt-1">
-                      🎵 Escalado em <strong>{eventosEscalados}</strong> evento(s) este mês
-                    </p>
-                  )}
-                </div>
+      {/* Info do usuário vinculado */}
+      {membroLogado ? (
+        <div className="mb-8 p-4 md:p-5 bg-slate-900 dark:bg-slate-800 rounded-2xl text-white transition-colors">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-lg">⭐</span>
+              </div>
+              <div>
+                <p className="text-sm text-slate-300">Você está escalado como</p>
+                <p className="font-semibold">{membroLogado.nome}</p>
               </div>
             </div>
-          ) : (
-            <div className="bg-gray-50 p-3 md:p-4 rounded-lg border-l-4 border-gray-400">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-2xl">ℹ️</span>
-                <div>
-                  <p className="text-gray-600 text-sm md:text-base">
-                    Você não está vinculado a nenhum membro. Peça ao administrador para vincular seu usuário a um membro.
-                  </p>
-                </div>
+            {eventosEscalados > 0 && (
+              <div className="text-right">
+                <p className="text-2xl font-bold">{eventosEscalados}</p>
+                <p className="text-xs text-slate-400">eventos este mês</p>
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Cards de resumo - versão mobile otimizada */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">
-          <div className="bg-white p-3 md:p-4 rounded-lg shadow-sm">
-            <div className="text-xs md:text-sm text-gray-500">Eventos Hoje</div>
-            <div className="text-xl md:text-2xl font-bold text-indigo-600">
-              {escalas.filter(e => e.data === format(new Date(), 'yyyy-MM-dd')).length}
-            </div>
-          </div>
-          <div className="bg-white p-3 md:p-4 rounded-lg shadow-sm">
-            <div className="text-xs md:text-sm text-gray-500">No Mês</div>
-            <div className="text-xl md:text-2xl font-bold text-indigo-600">{escalas.length}</div>
-          </div>
-          <div className="bg-white p-3 md:p-4 rounded-lg shadow-sm">
-            <div className="text-xs md:text-sm text-gray-500">Escalado</div>
-            <div className="text-xl md:text-2xl font-bold text-green-600">{eventosEscalados}</div>
-          </div>
-          <div className="bg-white p-3 md:p-4 rounded-lg shadow-sm">
-            <div className="text-xs md:text-sm text-gray-500">Próximos</div>
-            <div className="text-xl md:text-2xl font-bold text-indigo-600">{proximos.length}</div>
+            )}
           </div>
         </div>
-
-        {/* Toggle de visualização - mobile */}
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setViewMode('proximos')}
-            className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition ${
-              viewMode === 'proximos'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-200 text-gray-700'
-            }`}
-          >
-            📅 Próximos
-          </button>
-          <button
-            onClick={() => setViewMode('mes')}
-            className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition ${
-              viewMode === 'mes'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-200 text-gray-700'
-            }`}
-          >
-            📆 Mês
-          </button>
+      ) : (
+        <div className="mb-8 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/40 rounded-2xl">
+          <p className="text-sm text-amber-800 dark:text-amber-400">
+            Você não está vinculado a nenhum membro.
+          </p>
         </div>
+      )}
 
-        {/* Lista de Eventos - Versão Mobile otimizada */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="p-3 md:p-4 border-b flex justify-between items-center flex-wrap gap-2">
-            <h2 className="text-base md:text-lg font-semibold">
-              {viewMode === 'proximos' ? '📅 Próximos Eventos' : `📆 Escala do Mês`}
-            </h2>
-            <span className="text-xs md:text-sm text-gray-500">
-              {escalasExibir.length} {escalasExibir.length === 1 ? 'evento' : 'eventos'}
-            </span>
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
+        {[
+          { label: 'Hoje', value: escalas.filter(e => e.data === format(new Date(), 'yyyy-MM-dd')).length },
+          { label: 'Este mês', value: escalas.length },
+          { label: 'Escalado', value: eventosEscalados },
+          { label: 'Próximos', value: proximos.length },
+        ].map((item, i) => (
+          <div key={i} className="p-4 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl transition-colors">
+            <div className="text-xs text-slate-400 dark:text-slate-500 mb-1">{item.label}</div>
+            <div className="text-2xl md:text-3xl font-semibold text-slate-900 dark:text-white">{item.value}</div>
           </div>
+        ))}
+      </div>
 
-          {escalasExibir.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <div className="text-5xl mb-4">📅</div>
-              <p>Nenhum evento encontrado</p>
-              {viewMode === 'mes' && (
-                <p className="text-sm text-gray-400 mt-2">
-                  Não há eventos de escala para este mês.
-                </p>
-              )}
-              {viewMode === 'proximos' && (
-                <p className="text-sm text-gray-400 mt-2">
-                  Não há eventos próximos na escala.
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {escalasExibir.map((escala, index) => {
-                const estaEscalado = isUsuarioEscalado(escala);
-                const eventoEspecial = isEventoEspecial(escala);
-                const tipoEvento = getTipoEvento(escala);
-                const instrumento = getInstrumentoUsuario(escala);
-                const youtubeLink = getYouTubeLink(escala.link_youtube);
-                const isPastDate = isPast(parseISO(escala.data + 'T00:00:00')) && !isToday(parseISO(escala.data + 'T00:00:00'));
-                const temAnotacao = escala.anotacao && escala.anotacao.trim() !== '';
+      {/* Toggle */}
+      <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-6 transition-colors">
+        <button
+          onClick={() => setViewMode('proximos')}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+            viewMode === 'proximos' 
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm' 
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+          }`}
+        >
+          Próximos
+        </button>
+        <button
+          onClick={() => setViewMode('mes')}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+            viewMode === 'mes' 
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm' 
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+          }`}
+        >
+          Mês
+        </button>
+      </div>
 
-                return (
-                  <div 
-                    key={index} 
-                    className={`
-                      p-3 md:p-4 transition
-                      ${estaEscalado ? 'bg-orange-50 border-l-4 border-orange-500' : ''}
-                      ${eventoEspecial ? 'bg-purple-50 border-l-4 border-purple-500' : ''}
-                      ${isPastDate ? 'opacity-60' : ''}
-                    `}
-                  >
-                    <div className="flex flex-col gap-2">
-                      {/* Linha 1: Data e Status */}
-                      <div className="flex items-center justify-between flex-wrap gap-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-gray-800 text-sm md:text-base">
-                            📅 {formatarData(escala.data)}
-                          </span>
-                          {isToday(parseISO(escala.data + 'T00:00:00')) && (
-                            <span className="inline-block px-2 py-0.5 bg-red-500 text-white text-xs rounded-full animate-pulse">
-                              🔴 Hoje
-                            </span>
-                          )}
-                          {isPastDate && (
-                            <span className="inline-block px-2 py-0.5 bg-gray-300 text-gray-600 text-xs rounded-full">
-                              ✓ Realizado
-                            </span>
-                          )}
-                          {estaEscalado && (
-                            <span className="inline-block px-2 py-0.5 bg-orange-500 text-white text-xs rounded-full animate-pulse">
-                              ⭐ Você
-                            </span>
-                          )}
-                          {eventoEspecial && tipoEvento && (
-                            <span className="inline-block px-2 py-0.5 bg-purple-500 text-white text-xs rounded-full">
-                              {tipoEvento.icon} {tipoEvento.label}
-                            </span>
-                          )}
-                          {temAnotacao && (
-                            <button
-                              onClick={() => abrirAnotacao(escala.data, escala.anotacao, escala.dia_semana)}
-                              className="text-yellow-600 hover:text-yellow-800 text-sm transition-transform hover:scale-110"
-                              title="Ver anotação"
-                            >
-                              📝
-                            </button>
-                          )}
+      {/* Lista */}
+      {escalasExibir.length === 0 ? (
+        <div className="text-center py-16 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl transition-colors">
+          <div className="text-4xl mb-3 opacity-40">📅</div>
+          <p className="text-sm text-slate-400 dark:text-slate-500">Nenhum evento encontrado</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {escalasExibir.map((escala, index) => {
+            const estaEscalado = isUsuarioEscalado(escala);
+            const eventoEspecial = isEventoEspecial(escala);
+            const tipoEvento = getTipoEvento(escala);
+            const instrumento = getInstrumentoUsuario(escala);
+            const youtubeLink = getYouTubeLink(escala.link_youtube);
+            const isPastDate = isPast(parseISO(escala.data + 'T00:00:00')) && !isToday(parseISO(escala.data + 'T00:00:00'));
+            const temAnotacao = escala.anotacao && escala.anotacao.trim() !== '';
+
+            return (
+              <div
+                key={index}
+                className={`
+                  group p-4 md:p-5 bg-white dark:bg-slate-900 border rounded-2xl transition-all duration-200
+                  ${estaEscalado 
+                    ? 'border-slate-900 dark:border-white ring-1 ring-slate-900/5 dark:ring-white/10' 
+                    : 'border-slate-200/60 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                  }
+                  ${isPastDate ? 'opacity-50' : ''}
+                `}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    {/* Data e badges */}
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="font-semibold text-slate-900 dark:text-white text-sm md:text-base">
+                        {formatarData(escala.data)}
+                      </span>
+                      <span className="text-slate-300 dark:text-slate-600">·</span>
+                      <span className="text-sm text-slate-500 dark:text-slate-400">{escala.dia_semana}</span>
+                      {isToday(parseISO(escala.data + 'T00:00:00')) && (
+                        <span className="badge bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 ring-1 ring-red-100 dark:ring-red-900/40">
+                          <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
+                          Hoje
+                        </span>
+                      )}
+                      {estaEscalado && (
+                        <span className="badge bg-slate-900 dark:bg-white text-white dark:text-slate-900">
+                          ⭐ Você
+                        </span>
+                      )}
+                      {eventoEspecial && tipoEvento && (
+                        <span className="badge bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400 ring-1 ring-violet-100 dark:ring-violet-900/40">
+                          {tipoEvento.label}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Info principal */}
+                    <div className="mt-2">
+                      {estaEscalado && instrumento ? (
+                        <div className="flex items-center gap-2 text-sm">
+                          <span>{instrumento.icon}</span>
+                          <span className="font-medium text-slate-900 dark:text-white">{instrumento.label}</span>
+                          <span className="text-xs text-slate-400 dark:text-slate-500">— Você está aqui</span>
                         </div>
-                      </div>
-
-                      {/* Linha 2: Dia da Semana */}
-                      <div className="text-sm text-indigo-600 font-medium">
-                        {escala.dia_semana || '--'}
-                      </div>
-
-                      {/* Linha 3: Instrumento ou Evento */}
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex-1">
-                          {estaEscalado && instrumento ? (
-                            <div className="flex items-center gap-2 text-sm font-medium text-orange-700">
-                              <span className="text-lg">{instrumento.icon}</span>
-                              <span>{instrumento.label}</span>
-                              <span className="text-xs text-orange-500">(Você está aqui)</span>
-                            </div>
-                          ) : eventoEspecial ? (
-                            <div className="text-sm text-purple-700 font-medium">
-                              📌 {tipoEvento?.label || 'Evento Especial'}
-                            </div>
-                          ) : (
-                            <div className="text-xs text-gray-400">
-                              {escala.voz_nome || escala.violao_nome || escala.guitarra_nome || '--'}
-                            </div>
-                          )}
+                      ) : eventoEspecial ? (
+                        <div className="text-sm text-violet-700 dark:text-violet-400 font-medium">
+                          {tipoEvento?.icon} {tipoEvento?.label || 'Evento especial'}
                         </div>
-
-                        {/* Vídeo */}
-                        <div className="flex-shrink-0">
-                          {youtubeLink ? (
-                            <a
-                              href={youtubeLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
-                            >
-                              ▶️ Vídeo
-                            </a>
-                          ) : (
-                            <span className="text-xs text-gray-300">--</span>
-                          )}
+                      ) : (
+                        <div className="text-sm text-slate-500 dark:text-slate-400">
+                          {escala.voz_nome || escala.violao_nome || escala.guitarra_nome || 'Sem escala definida'}
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
-        {/* Legenda - Mobile */}
-        <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 flex flex-wrap gap-3">
-          <span>📌 <strong>Legenda:</strong></span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 bg-orange-400 rounded"></span> Você está escalado
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 bg-purple-400 rounded"></span> Evento Especial
-          </span>
-          <span>🔴 Hoje</span>
-          <span>✓ Realizado</span>
-          <span>⭐ Pulsante</span>
-          <span className="flex items-center gap-1">
-            <span className="text-yellow-600">📝</span> Anotação
-          </span>
+                  {/* Ações */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {temAnotacao && (
+                      <button
+                        onClick={() => setAnotacaoModal({ data: escala.data, anotacao: escala.anotacao, dia_semana: escala.dia_semana })}
+                        className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                        title="Ver anotação"
+                      >
+                        📝
+                      </button>
+                    )}
+                    {youtubeLink && (
+                      <a
+                        href={youtubeLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 dark:text-slate-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                        title="Ver vídeo"
+                      >
+                        ▶
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Legenda */}
+      <div className="mt-6 p-4 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl transition-colors">
+        <p className="text-xs font-medium text-slate-900 dark:text-white mb-3">Legenda</p>
+        <div className="flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 bg-slate-900 dark:bg-white rounded"></span>
+            <span>Você está escalado</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 bg-violet-400 dark:bg-violet-500 rounded"></span>
+            <span>Evento especial</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 bg-red-500 rounded-full"></span>
+            <span>Hoje</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>📝</span>
+            <span>Anotações</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>▶</span>
+            <span>Vídeo</span>
+          </div>
         </div>
       </div>
 
-      {/* MODAL DE ANOTAÇÃO */}
+      {/* Modal de anotação */}
       {anotacaoModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">
-                📝 Anotação - {formatarData(anotacaoModal.data)}
-                {anotacaoModal.dia_semana && (
-                  <span className="text-sm font-normal text-gray-500 ml-2">
-                    ({anotacaoModal.dia_semana})
-                  </span>
-                )}
-              </h3>
+        <div 
+          className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" 
+          onClick={() => setAnotacaoModal(null)}
+        >
+          <div 
+            className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl max-w-md w-full p-6 max-h-[80vh] overflow-y-auto border border-slate-200/60 dark:border-slate-800 transition-colors" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white">Anotação</h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                  {formatarData(anotacaoModal.data)} · {anotacaoModal.dia_semana}
+                </p>
+              </div>
               <button
-                onClick={fecharAnotacao}
-                className="text-gray-400 hover:text-gray-600 text-xl"
+                onClick={() => setAnotacaoModal(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 ✕
               </button>
             </div>
-            <div className="mb-4">
-              {anotacaoModal.anotacao ? (
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">
-                    {anotacaoModal.anotacao}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-gray-400 text-sm">Nenhuma anotação para esta data.</p>
-              )}
-            </div>
-            <div className="flex justify-end">
-              <button
-                onClick={fecharAnotacao}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
-              >
-                Fechar
-              </button>
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+              <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                {anotacaoModal.anotacao}
+              </p>
             </div>
           </div>
         </div>
       )}
-
-      {/* Estilos para o destaque pulsante */}
-      <style jsx global>{`
-        .membro-destaque {
-          display: inline-block;
-          background: linear-gradient(135deg, #f6ad55 0%, #ed8936 100%);
-          color: white;
-          padding: 2px 10px;
-          border-radius: 20px;
-          font-weight: 700;
-          font-size: 13px;
-          animation: pulse-destaque 2s ease-in-out infinite;
-          box-shadow: 0 2px 10px rgba(237, 137, 54, 0.3);
-          border: 2px solid #dd6b20;
-        }
-        .membro-destaque .badge-eu {
-          background: rgba(255,255,255,0.3);
-          padding: 1px 6px;
-          border-radius: 12px;
-          font-size: 9px;
-          font-weight: 600;
-          margin-left: 4px;
-          color: white;
-          text-transform: uppercase;
-        }
-        @keyframes pulse-destaque {
-          0% {
-            transform: scale(1);
-            box-shadow: 0 2px 10px rgba(237, 137, 54, 0.3);
-          }
-          50% {
-            transform: scale(1.05);
-            box-shadow: 0 4px 20px rgba(237, 137, 54, 0.5);
-          }
-          100% {
-            transform: scale(1);
-            box-shadow: 0 2px 10px rgba(237, 137, 54, 0.3);
-          }
-        }
-        .bg-orange-50 {
-          background-color: #fffbeb !important;
-        }
-        .bg-purple-50 {
-          background-color: #faf5ff !important;
-        }
-      `}</style>
     </Layout>
   );
 }

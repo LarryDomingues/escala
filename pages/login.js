@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Head from 'next/head';
-import Image from 'next/image';
 
 export default function Login() {
   const router = useRouter();
@@ -21,7 +20,7 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await axios.post('/api/auth/login', { email, senha });
-      if (res.data.success) {
+         if (res.data.success) {
         window.location.href = '/';
       }
     } catch (error) {
@@ -38,17 +37,11 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await axios.post('/api/auth/register', {
-        nome,
-        email,
-        senha,
-        confirmar_senha: confirmarSenha,
+        nome, email, senha, confirmar_senha: confirmarSenha,
       });
       setSuccess(res.data.message);
       setIsLogin(true);
-      setNome('');
-      setEmail('');
-      setSenha('');
-      setConfirmarSenha('');
+      setNome(''); setEmail(''); setSenha(''); setConfirmarSenha('');
     } catch (error) {
       setError(error.response?.data?.error || 'Erro ao cadastrar');
     } finally {
@@ -58,134 +51,98 @@ export default function Login() {
 
   return (
     <>
-      <Head>
-        <title>Login - Escala de Louvor</title>
-      </Head>
-      <div className="min-h-screen flex items-center justify-center bg-black p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-md">
-          <div className="text-center mb-6">
-            <div className="flex justify-center mb-2">
-              <Image src="/logo.png" alt="Logo" width={320} height={320} className="rounded-xl" />
-            </div>
+      <Head><title>Entrar · Escala de Louvor</title></Head>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <div className="w-full max-w-sm">
+          {/* LOGO ORIGINAL */}
+          <div className="flex flex-col items-center mb-8">
+            <img 
+              src="/logo.png" 
+              alt="Louvor" 
+              className="h-20 w-auto object-contain mb-4"
+            />
             
-            <p className="text-gray-500 text-sm">Sistema de Escala</p>
           </div>
 
-          {error && (
-            <div className="bg-red-50 text-red-700 p-3 rounded-xl mb-4 text-sm border border-red-200">
-              {error}
-            </div>
-          )}
+          {/* Card */}
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-100 rounded-xl mb-4 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl mb-4 text-sm text-emerald-700">
+                {success}
+              </div>
+            )}
 
-          {success && (
-            <div className="bg-green-50 text-green-700 p-3 rounded-xl mb-4 text-sm border border-green-200">
-              {success}
-            </div>
-          )}
+            {isLogin ? (
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">E-mail</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="input-field"
+                    placeholder="seu@email.com"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Senha</label>
+                  <input
+                    type="password"
+                    value={senha}
+                    onChange={(e) => setSenha(e.target.value)}
+                    className="input-field"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+                <button type="submit" disabled={loading} className="btn-primary w-full">
+                  {loading ? 'Entrando...' : 'Entrar'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Nome completo</label>
+                  <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} className="input-field" placeholder="Seu nome" required />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">E-mail</label>
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field" placeholder="seu@email.com" required />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Senha</label>
+                  <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} className="input-field" placeholder="Mínimo 6 caracteres" required minLength={6} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Confirmar senha</label>
+                  <input type="password" value={confirmarSenha} onChange={(e) => setConfirmarSenha(e.target.value)} className="input-field" placeholder="Confirme sua senha" required minLength={6} />
+                </div>
+                <button type="submit" disabled={loading} className="btn-primary w-full">
+                  {loading ? 'Cadastrando...' : 'Criar conta'}
+                </button>
+              </form>
+            )}
 
-          {isLogin ? (
-            <form onSubmit={handleLogin}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input-field"
-                  placeholder="Digite seu email"
-                  required
-                />
-              </div>
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-                <input
-                  type="password"
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  className="input-field"
-                  placeholder="Digite sua senha"
-                  required
-                />
-              </div>
+            <div className="mt-6 pt-6 border-t border-slate-200/70 text-center">
               <button
-                type="submit"
-                disabled={loading}
-                className="btn-primary w-full py-3 text-base"
+                onClick={() => { setIsLogin(!isLogin); setError(''); setSuccess(''); }}
+                className="text-sm text-slate-500 hover:text-slate-900 transition-colors"
               >
-                {loading ? 'Entrando...' : 'Entrar'}
+                {isLogin ? 'Não tem uma conta? ' : 'Já tem uma conta? '}
+                <span className="font-medium text-slate-900">{isLogin ? 'Cadastre-se' : 'Entrar'}</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setIsLogin(false)}
-                className="w-full mt-4 text-indigo-600 hover:underline text-sm"
-              >
-                Não tem uma conta? Cadastre-se
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleRegister}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
-                <input
-                  type="text"
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  className="input-field"
-                  placeholder="Digite seu nome"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input-field"
-                  placeholder="Digite seu email"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-                <input
-                  type="password"
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  className="input-field"
-                  placeholder="Mínimo 6 caracteres"
-                  required
-                  minLength={6}
-                />
-              </div>
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Confirmar Senha</label>
-                <input
-                  type="password"
-                  value={confirmarSenha}
-                  onChange={(e) => setConfirmarSenha(e.target.value)}
-                  className="input-field"
-                  placeholder="Confirme sua senha"
-                  required
-                  minLength={6}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn-success w-full py-3 text-base"
-              >
-                {loading ? 'Cadastrando...' : 'Cadastrar'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsLogin(true)}
-                className="w-full mt-4 text-indigo-600 hover:underline text-sm"
-              >
-                Já tem uma conta? Faça login
-              </button>
-            </form>
-          )}
+            </div>
+          </div>
+
+          <p className="text-center text-xs text-slate-400 mt-6">
+            © {new Date().getFullYear()} Ministério de Louvor
+          </p>
         </div>
       </div>
     </>
