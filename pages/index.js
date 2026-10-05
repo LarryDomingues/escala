@@ -22,7 +22,7 @@ export default function Dashboard() {
   const [viewMode, setViewMode] = useState('proximos');
   const [anotacaoModal, setAnotacaoModal] = useState(null);
 
-  const loadData = useCallback(async (forceRefresh = false) => {
+  const loadData = useCallback(async (currentUser, forceRefresh = false) => {
     const now = Date.now();
     if (!forceRefresh && dashboardCache && (now - dashboardCacheTime) < DASHBOARD_CACHE_TTL) {
       const cached = dashboardCache;
@@ -48,11 +48,11 @@ export default function Dashboard() {
       const membrosData = membrosRes.data;
 
       let membro = null;
-      if (user && user.id) {
-        membro = membrosData.find(m => m.usuario_id === user.id) || null;
+      if (currentUser && currentUser.id) {
+        membro = membrosData.find(m => m.usuario_id === currentUser.id) || null;
       }
-      if (user && user.membro) {
-        membro = user.membro;
+      if (currentUser && currentUser.membro) {
+        membro = currentUser.membro;
       }
 
       const hoje = format(new Date(), 'yyyy-MM-dd');
@@ -71,7 +71,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -79,7 +79,7 @@ export default function Dashboard() {
         const res = await axios.get('/api/auth/me');
         setUser(res.data);
         if (res.data && res.data.membro) setMembroLogado(res.data.membro);
-        await loadData();
+        await loadData(res.data);
       } catch (error) {
         router.push('/login');
       }
@@ -155,7 +155,7 @@ export default function Dashboard() {
       <Layout>
         <div className="p-6 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/40 rounded-2xl">
           <p className="text-sm text-red-700 dark:text-red-400 mb-3">{error}</p>
-          <button onClick={() => loadData(true)} className="btn-primary">Tentar novamente</button>
+          <button onClick={() => loadData(user, true)} className="btn-primary">Tentar novamente</button>
         </div>
       </Layout>
     );
