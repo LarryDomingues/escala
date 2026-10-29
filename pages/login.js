@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Head from 'next/head';
+import Logo from '../components/Logo';
 
 export default function Login() {
   const router = useRouter();
@@ -20,9 +21,7 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await axios.post('/api/auth/login', { email, senha });
-         if (res.data.success) {
-        window.location.href = '/';
-      }
+      if (res.data.success) router.push('/');
     } catch (error) {
       setError(error.response?.data?.error || 'Erro ao fazer login');
     } finally {
@@ -52,27 +51,21 @@ export default function Login() {
   return (
     <>
       <Head><title>Entrar · Escala de Louvor</title></Head>
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 transition-colors">
         <div className="w-full max-w-sm">
-          {/* LOGO ORIGINAL */}
           <div className="flex flex-col items-center mb-8">
-            <img 
-              src="/logo.png" 
-              alt="Louvor" 
-              className="h-20 w-auto object-contain mb-4"
-            />
+            <Logo className="h-20 w-auto object-contain mb-4" />
             
           </div>
 
-          {/* Card */}
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-800 p-6 transition-colors">
             {error && (
-              <div className="p-3 bg-red-50 border border-red-100 rounded-xl mb-4 text-sm text-red-700">
+              <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/40 rounded-xl mb-4 text-sm text-red-700 dark:text-red-400">
                 {error}
               </div>
             )}
             {success && (
-              <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl mb-4 text-sm text-emerald-700">
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 rounded-xl mb-4 text-sm text-emerald-700 dark:text-emerald-400">
                 {success}
               </div>
             )}
@@ -80,7 +73,7 @@ export default function Login() {
             {isLogin ? (
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">E-mail</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">E-mail</label>
                   <input
                     type="email"
                     value={email}
@@ -91,7 +84,7 @@ export default function Login() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Senha</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">Senha</label>
                   <input
                     type="password"
                     value={senha}
@@ -108,19 +101,19 @@ export default function Login() {
             ) : (
               <form onSubmit={handleRegister} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Nome completo</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">Nome completo</label>
                   <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} className="input-field" placeholder="Seu nome" required />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">E-mail</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">E-mail</label>
                   <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field" placeholder="seu@email.com" required />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Senha</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">Senha</label>
                   <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} className="input-field" placeholder="Mínimo 6 caracteres" required minLength={6} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Confirmar senha</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">Confirmar senha</label>
                   <input type="password" value={confirmarSenha} onChange={(e) => setConfirmarSenha(e.target.value)} className="input-field" placeholder="Confirme sua senha" required minLength={6} />
                 </div>
                 <button type="submit" disabled={loading} className="btn-primary w-full">
@@ -129,18 +122,18 @@ export default function Login() {
               </form>
             )}
 
-            <div className="mt-6 pt-6 border-t border-slate-200/70 text-center">
+            <div className="mt-6 pt-6 border-t border-slate-200/70 dark:border-slate-800 text-center">
               <button
                 onClick={() => { setIsLogin(!isLogin); setError(''); setSuccess(''); }}
-                className="text-sm text-slate-500 hover:text-slate-900 transition-colors"
+                className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
               >
                 {isLogin ? 'Não tem uma conta? ' : 'Já tem uma conta? '}
-                <span className="font-medium text-slate-900">{isLogin ? 'Cadastre-se' : 'Entrar'}</span>
+                <span className="font-medium text-slate-900 dark:text-white">{isLogin ? 'Cadastre-se' : 'Entrar'}</span>
               </button>
             </div>
           </div>
 
-          <p className="text-center text-xs text-slate-400 mt-6">
+          <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-6">
             © {new Date().getFullYear()} Ministério de Louvor
           </p>
         </div>

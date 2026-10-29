@@ -1,4 +1,3 @@
-// contexts/ThemeContext.js
 import { createContext, useContext, useState, useEffect } from 'react';
 
 const ThemeContext = createContext({});
@@ -7,31 +6,32 @@ export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState('light');
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    // Carregar tema salvo
-    const savedTheme = localStorage.getItem('theme');
-    
-    if (savedTheme) {
-      setTheme(savedTheme);
-      applyTheme(savedTheme);
-    } else {
-      // Verificar preferência do sistema
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const initialTheme = prefersDark ? 'dark' : 'light';
-      setTheme(initialTheme);
-      applyTheme(initialTheme);
-    }
-    
-    setMounted(true);
-  }, []);
-
   const applyTheme = (newTheme) => {
+    const html = document.documentElement;
+    const body = document.body;
+
     if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark');
+      html.classList.add('dark');
+      html.style.colorScheme = 'dark';
+      html.style.backgroundColor = '#020617';
+      if (body) body.style.backgroundColor = '#020617';
     } else {
-      document.documentElement.classList.remove('dark');
+      html.classList.remove('dark');
+      html.style.colorScheme = 'light';
+      html.style.backgroundColor = '#f8fafc';
+      if (body) body.style.backgroundColor = '#f8fafc';
     }
   };
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+
+    setTheme(initialTheme);
+    applyTheme(initialTheme);
+    setMounted(true);
+  }, []);
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';

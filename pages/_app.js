@@ -5,23 +5,17 @@ import axios from 'axios';
 import Head from 'next/head';
 import { ThemeProvider } from '../contexts/ThemeContext';
 
-// Cache do usuário
 let userCache = null;
 let userCacheTime = 0;
-const CACHE_DURATION = 30000;
+const CACHE_DURATION = 5 * 60 * 1000;
 
-// Registrar Service Worker
 const registerServiceWorker = () => {
-  if ('serviceWorker' in navigator) {
+  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker
         .register('/sw.js')
-        .then((registration) => {
-          console.log('✅ Service Worker registrado');
-        })
-        .catch((error) => {
-          console.log('❌ Falha ao registrar SW:', error);
-        });
+        .then(() => console.log('✅ Service Worker registrado'))
+        .catch((error) => console.log('❌ Falha ao registrar SW:', error));
     });
   }
 };
@@ -47,10 +41,7 @@ function MyApp({ Component, pageProps }) {
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    
-    window.addEventListener('appinstalled', () => {
-      setShowInstallBanner(false);
-    });
+    window.addEventListener('appinstalled', () => setShowInstallBanner(false));
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -61,9 +52,7 @@ function MyApp({ Component, pageProps }) {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setShowInstallBanner(false);
-      }
+      if (outcome === 'accepted') setShowInstallBanner(false);
       setDeferredPrompt(null);
     }
   };
@@ -149,7 +138,7 @@ function MyApp({ Component, pageProps }) {
         <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors">
           <div className="flex flex-col items-center gap-3">
             <div className="w-8 h-8 border-2 border-slate-200 dark:border-slate-800 border-t-slate-900 dark:border-t-white rounded-full animate-spin"></div>
-            <p className="text-sm text-slate-400">Carregando</p>
+            <p className="text-sm text-slate-400 dark:text-slate-500">Carregando</p>
           </div>
         </div>
       </>
@@ -163,13 +152,10 @@ function MyApp({ Component, pageProps }) {
       <Head>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover" />
-        <meta name="theme-color" content="#0f172a" />
+        <meta name="theme-color" content="#020617" />
         <meta name="description" content="Sistema de Escala do Ministério de Louvor" />
         <title>Escala de Louvor</title>
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link rel="icon" href="/logo.png" />
       </Head>
 
       {showInstallBanner && (
