@@ -59,7 +59,7 @@ export default function MenuLateral() {
       <header className="md:hidden fixed top-0 left-0 right-0 h-14 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/70 dark:border-slate-800 z-40 flex items-center justify-between px-4 transition-colors">
         <div className="flex items-center gap-2.5">
           <Logo className="h-9 w-auto object-contain" />
-          <span className="text-sm font-semibold text-slate-900 dark:text-white">Louvor</span>
+          
         </div>
         <div className="flex items-center gap-1">
           {mounted && (
