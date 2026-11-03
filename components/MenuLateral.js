@@ -115,8 +115,7 @@ export default function MenuLateral() {
           <div className="flex items-center gap-3">
             <Logo className="h-10 w-auto object-contain" />
             <div>
-              <div className="font-semibold text-slate-900 dark:text-white text-sm">Louvor</div>
-              <div className="text-xs text-slate-400 dark:text-slate-500">Escala</div>
+             
             </div>
           </div>
           <button
