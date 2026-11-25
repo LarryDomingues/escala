@@ -1,11 +1,9 @@
 import { useState } from 'react';
-import { useRouter } from 'next/router';
 import axios from 'axios';
 import Head from 'next/head';
 import Logo from '../components/Logo';
 
 export default function Login() {
-  const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -21,7 +19,7 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await axios.post('/api/auth/login', { email, senha });
-      if (res.data.success) router.push('/');
+      if (res.data.success) window.location.href = '/';
     } catch (error) {
       setError(error.response?.data?.error || 'Erro ao fazer login');
     } finally {
